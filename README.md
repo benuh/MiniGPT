@@ -22,6 +22,7 @@ source ~/.zshrc  # or source ~/.bashrc
 ```
 
 **Note:** Throughout this README:
+
 - Replace `python` with `python3` if needed
 - Replace `pip` with `pip3` if needed
 - If you see "command not found" errors, ensure the Python scripts are in your PATH
@@ -29,22 +30,26 @@ source ~/.zshrc  # or source ~/.bashrc
 ## Features
 
 ### 🏗️ Core Architecture
+
 - **Transformer Model**: Clean GPT-style implementation with multi-head attention
 - **Modular Design**: Separate components for attention, MLP, and transformer blocks
 - **Configurable**: Easy to adjust model size and hyperparameters
 
 ### 🚀 Training Pipeline
+
 - **Professional Training Loop**: Complete with validation, checkpointing, and logging
 - **Data Loading**: Efficient batching and preprocessing for text data
 - **Experiment Tracking**: Integration with Weights & Biases
 - **Resumable Training**: Save and resume from checkpoints
 
 ### 💬 Inference & Chat
+
 - **Interactive Chat Interface**: Real-time conversation with your trained model
 - **Flexible Generation**: Configurable temperature, top-k sampling
 - **Command System**: Built-in commands for adjusting generation parameters
 
 ### 🔧 ML Engineering Best Practices
+
 - **Configuration Management**: YAML-based configs for reproducible experiments
 - **Device Agnostic**: Automatic GPU/MPS/CPU detection
 - **Comprehensive Utilities**: Parameter counting, checkpointing, metrics
@@ -65,6 +70,7 @@ python3 -m pip install -e .
 ```
 
 **Troubleshooting Installation:**
+
 - If `pip install -e .` fails, try `python3 -m pip install -e .`
 - If you get PATH warnings, add the Python bin directory to your PATH (see Prerequisites above)
 - On macOS, you may need to install Xcode Command Line Tools: `xcode-select --install`
@@ -124,6 +130,7 @@ MiniGPT/
 ## Model Configurations
 
 ### Small Model (Default)
+
 - **Parameters**: ~87K
 - **Layers**: 4
 - **Hidden Size**: 128
@@ -192,18 +199,21 @@ The interactive chat interface supports these commands:
 ## Technical Details
 
 ### Architecture
+
 - **Attention**: Scaled dot-product with causal masking
 - **Position Encoding**: Learned position embeddings
 - **Activation**: GELU activation functions
 - **Normalization**: Layer normalization (pre-norm)
 
 ### Training
+
 - **Optimizer**: AdamW with weight decay
 - **Scheduler**: Linear warmup (configurable)
 - **Loss**: Cross-entropy on next-token prediction
 - **Validation**: Automatic best model selection
 
 ### Generation
+
 - **Sampling**: Temperature and top-k sampling
 - **Context**: Automatic context window management
 - **Stopping**: Configurable max tokens
@@ -211,6 +221,7 @@ The interactive chat interface supports these commands:
 ## Advanced Usage
 
 ### Continuous Improvement System
+
 ```bash
 # Start automated training (runs for 8 hours, then restarts)
 chmod +x scripts/start_continuous.sh
@@ -218,6 +229,7 @@ chmod +x scripts/start_continuous.sh
 ```
 
 ### API Server
+
 ```bash
 # Start REST API server
 python scripts/start_server.py
@@ -228,6 +240,7 @@ python3 scripts/start_server.py
 ```
 
 ### Docker Deployment
+
 ```bash
 # Build and run with Docker
 ./scripts/docker_build.sh build
@@ -238,6 +251,7 @@ docker-compose up -d
 ```
 
 ### Model Evaluation & Comparison
+
 ```bash
 # Evaluate a trained model
 python scripts/run_evaluation.py
@@ -265,10 +279,4 @@ MIT License - feel free to use this for learning and experimentation!
 ## Acknowledgments
 
 - Inspired by Andrej Karpathy's educational materials
-- Built with PyTorch and Transformers library
 - Uses the Wikitext dataset for training
-
----
-
-**Happy experimenting!** 🚀
-
