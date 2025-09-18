@@ -1,0 +1,388 @@
+"""
+FastAPI web service for MiniGPT model inference
+Provides REST API endpoints for text generation and model management
+"""
+
+import os
+import asyncio
+from typing import List, Optional, Dict, Any
+from pathlib import Path
+import logging
+
+from fastapi import FastAPI, HTTPException, BackgroundTasks, UploadFile, File
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import HTMLResponse, StreamingResponse
+from pydantic import BaseModel, Field
+import uvicorn
+import torch
+
+from .model import MiniGPT
+from .tokenizer import get_tokenizer
+from .chat import ChatBot
+from .utils import get_device, load_checkpoint
+from .evaluate import ModelEvaluator
+
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Pydantic models for API
+class GenerationRequest(BaseModel):
+    prompt: str = Field(..., description="Input text prompt")
+    max_length: int = Field(50, ge=1, le=200, description="Maximum tokens to generate")
+    temperature: float = Field(0.8, ge=0.1, le=2.0, description="Sampling temperature")
+    top_k: int = Field(50, ge=1, le=100, description="Top-k sampling parameter")
+
+
+class GenerationResponse(BaseModel):
+    prompt: str
+    generated_text: str
+    full_text: str
+    generation_time: float
+    tokens_generated: int
+
+
+class ChatMessage(BaseModel):
+    message: str
+    max_length: int = Field(50, ge=1, le=200)
+    temperature: float = Field(0.8, ge=0.1, le=2.0)
+    top_k: int = Field(50, ge=1, le=100)
+
+
+class ChatResponse(BaseModel):
+    response: str
+    generation_time: float
+
+
+class ModelInfo(BaseModel):
+    model_name: str
+    parameters: int
+    vocab_size: int
+    context_length: int
+    device: str
+    status: str
+
+
+class HealthResponse(BaseModel):
+    status: str
+    model_loaded: bool
+    device: str
+    memory_usage: Optional[Dict[str, float]] = None
+
+
+# Global model instance
+model_manager = None
+
+
+class ModelManager:
+    def __init__(self):
+        self.model = None
+        self.tokenizer = None
+        self.chatbot = None
+        self.device = get_device()
+        self.model_info = {}
+
+    def load_model(self, model_path: str) -> Dict[str, Any]:
+        """Load model from checkpoint"""
+        try:
+            logger.info(f"Loading model from {model_path}")
+
+            # Load checkpoint
+            checkpoint = load_checkpoint(model_path, self.device)
+            config = checkpoint.get('config', {})
+            model_config = config.get('model', {})
+
+            # Initialize model
+            self.model = MiniGPT(**model_config).to(self.device)
+            self.model.load_state_dict(checkpoint['model_state_dict'])
+            self.model.eval()
+
+            # Initialize tokenizer
+            self.tokenizer = get_tokenizer("gpt2")
+
+            # Initialize chatbot
+            self.chatbot = ChatBot(model_path)
+
+            # Store model info
+            self.model_info = {
+                'model_path': model_path,
+                'parameters': self.model.count_parameters(),
+                'vocab_size': self.model.vocab_size,
+                'context_length': self.model.block_size,
+                'device': str(self.device),
+                'config': config
+            }
+
+            logger.info(f"Model loaded successfully: {self.model_info['parameters']:,} parameters")
+            return self.model_info
+
+        except Exception as e:
+            logger.error(f"Failed to load model: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Failed to load model: {str(e)}")
+
+    def is_ready(self) -> bool:
+        """Check if model is loaded and ready"""
+        return self.model is not None and self.tokenizer is not None
+
+    def generate_text(self, prompt: str, max_length: int = 50, temperature: float = 0.8, top_k: int = 50) -> Dict[str, Any]:
+        """Generate text using the loaded model"""
+        if not self.is_ready():
+            raise HTTPException(status_code=503, detail="Model not loaded")
+
+        try:
+            import time
+            start_time = time.time()
+
+            # Generate text
+            full_text = self.chatbot.generate_text(prompt, max_length, temperature, top_k)
+            generated_text = full_text[len(prompt):].strip()
+
+            end_time = time.time()
+            generation_time = end_time - start_time
+
+            # Count tokens (approximate)
+            tokens_generated = len(generated_text.split())
+
+            return {
+                'prompt': prompt,
+                'generated_text': generated_text,
+                'full_text': full_text,
+                'generation_time': generation_time,
+                'tokens_generated': tokens_generated
+            }
+
+        except Exception as e:
+            logger.error(f"Generation failed: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Generation failed: {str(e)}")
+
+
+# Initialize FastAPI app
+app = FastAPI(
+    title="MiniGPT API",
+    description="REST API for MiniGPT text generation model",
+    version="1.0.0",
+    docs_url="/docs",
+    redoc_url="/redoc"
+)
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # In production, specify allowed origins
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Initialize model manager
+@app.on_event("startup")
+async def startup_event():
+    global model_manager
+    model_manager = ModelManager()
+
+    # Try to load the latest model automatically
+    checkpoints_dir = Path("checkpoints")
+    if checkpoints_dir.exists():
+        checkpoints = list(checkpoints_dir.glob("*.pt"))
+        if checkpoints:
+            latest_checkpoint = max(checkpoints, key=lambda x: x.stat().st_mtime)
+            try:
+                model_manager.load_model(latest_checkpoint.name)
+                logger.info(f"Auto-loaded latest model: {latest_checkpoint.name}")
+            except Exception as e:
+                logger.warning(f"Failed to auto-load model: {str(e)}")
+
+
+# Health check endpoint
+@app.get("/health", response_model=HealthResponse)
+async def health_check():
+    """Check API health and model status"""
+    memory_usage = None
+
+    if torch.cuda.is_available():
+        memory_usage = {
+            "allocated_mb": torch.cuda.memory_allocated() / 1024 / 1024,
+            "cached_mb": torch.cuda.memory_reserved() / 1024 / 1024
+        }
+
+    return HealthResponse(
+        status="healthy",
+        model_loaded=model_manager.is_ready() if model_manager else False,
+        device=str(model_manager.device) if model_manager else "unknown",
+        memory_usage=memory_usage
+    )
+
+
+# Model management endpoints
+@app.post("/model/load")
+async def load_model(model_name: str):
+    """Load a specific model checkpoint"""
+    if not model_manager:
+        raise HTTPException(status_code=503, detail="Model manager not initialized")
+
+    model_path = f"checkpoints/{model_name}"
+    if not Path(model_path).exists():
+        raise HTTPException(status_code=404, detail=f"Model {model_name} not found")
+
+    info = model_manager.load_model(model_name)
+    return {"message": f"Model {model_name} loaded successfully", "info": info}
+
+
+@app.get("/model/info", response_model=ModelInfo)
+async def get_model_info():
+    """Get information about the currently loaded model"""
+    if not model_manager or not model_manager.is_ready():
+        raise HTTPException(status_code=503, detail="No model loaded")
+
+    info = model_manager.model_info
+    return ModelInfo(
+        model_name=Path(info['model_path']).name,
+        parameters=info['parameters'],
+        vocab_size=info['vocab_size'],
+        context_length=info['context_length'],
+        device=info['device'],
+        status="ready"
+    )
+
+
+@app.get("/model/list")
+async def list_models():
+    """List available model checkpoints"""
+    checkpoints_dir = Path("checkpoints")
+    if not checkpoints_dir.exists():
+        return {"models": []}
+
+    models = []
+    for checkpoint in checkpoints_dir.glob("*.pt"):
+        models.append({
+            "name": checkpoint.name,
+            "size_mb": checkpoint.stat().st_size / (1024 * 1024),
+            "modified": checkpoint.stat().st_mtime
+        })
+
+    return {"models": sorted(models, key=lambda x: x["modified"], reverse=True)}
+
+
+# Text generation endpoints
+@app.post("/generate", response_model=GenerationResponse)
+async def generate_text(request: GenerationRequest):
+    """Generate text from a prompt"""
+    if not model_manager or not model_manager.is_ready():
+        raise HTTPException(status_code=503, detail="No model loaded")
+
+    result = model_manager.generate_text(
+        request.prompt,
+        request.max_length,
+        request.temperature,
+        request.top_k
+    )
+
+    return GenerationResponse(**result)
+
+
+@app.post("/chat", response_model=ChatResponse)
+async def chat(message: ChatMessage):
+    """Single-turn chat with the model"""
+    if not model_manager or not model_manager.is_ready():
+        raise HTTPException(status_code=503, detail="No model loaded")
+
+    import time
+    start_time = time.time()
+
+    response_text = model_manager.generate_text(
+        message.message,
+        message.max_length,
+        message.temperature,
+        message.top_k
+    )["generated_text"]
+
+    generation_time = time.time() - start_time
+
+    return ChatResponse(
+        response=response_text,
+        generation_time=generation_time
+    )
+
+
+@app.get("/generate/stream")
+async def stream_generate(
+    prompt: str,
+    max_length: int = 50,
+    temperature: float = 0.8,
+    top_k: int = 50
+):
+    """Stream text generation (simplified version)"""
+    if not model_manager or not model_manager.is_ready():
+        raise HTTPException(status_code=503, detail="No model loaded")
+
+    async def generate_stream():
+        # This is a simplified streaming implementation
+        # In a real implementation, you'd modify the model to yield tokens
+        result = model_manager.generate_text(prompt, max_length, temperature, top_k)
+
+        # Simulate streaming by yielding words
+        words = result["generated_text"].split()
+        for word in words:
+            yield f"data: {word} \n\n"
+            await asyncio.sleep(0.1)  # Simulate generation delay
+
+        yield f"data: [DONE]\n\n"
+
+    return StreamingResponse(generate_stream(), media_type="text/plain")
+
+
+# Utility endpoints
+@app.get("/")
+async def root():
+    """Root endpoint with API information"""
+    return {
+        "name": "MiniGPT API",
+        "version": "1.0.0",
+        "description": "REST API for MiniGPT text generation",
+        "endpoints": {
+            "health": "/health",
+            "generate": "/generate",
+            "chat": "/chat",
+            "model_info": "/model/info",
+            "docs": "/docs"
+        }
+    }
+
+
+def create_app():
+    """Factory function to create the FastAPI app"""
+    return app
+
+
+def run_server(host: str = "0.0.0.0", port: int = 8000, workers: int = 1):
+    """Run the FastAPI server"""
+    uvicorn.run(
+        "minigpt.api:app",
+        host=host,
+        port=port,
+        workers=workers,
+        reload=False,
+        access_log=True
+    )
+
+
+if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser(description="MiniGPT API Server")
+    parser.add_argument("--host", type=str, default="0.0.0.0", help="Host to bind to")
+    parser.add_argument("--port", type=int, default=8000, help="Port to bind to")
+    parser.add_argument("--workers", type=int, default=1, help="Number of worker processes")
+    parser.add_argument("--model", type=str, help="Model checkpoint to load on startup")
+
+    args = parser.parse_args()
+
+    if args.model:
+        # Pre-load model
+        manager = ModelManager()
+        manager.load_model(args.model)
+        model_manager = manager
+
+    run_server(args.host, args.port, args.workers)

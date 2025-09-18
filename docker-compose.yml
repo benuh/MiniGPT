@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  minigpt-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: minigpt-api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./checkpoints:/app/checkpoints:ro
+      - ./data:/app/data:ro
+      - minigpt-logs:/app/logs
+    environment:
+      - PYTHONUNBUFFERED=1
+      - MODEL_PATH=/app/checkpoints
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  minigpt-trainer:
+    build:
+      context: .
+      dockerfile: Dockerfile.trainer
+    container_name: minigpt-trainer
+    volumes:
+      - ./checkpoints:/app/checkpoints
+      - ./data:/app/data
+      - ./configs:/app/configs:ro
+      - minigpt-logs:/app/logs
+      - minigpt-experiments:/app/experiments
+    environment:
+      - PYTHONUNBUFFERED=1
+      - WANDB_API_KEY=${WANDB_API_KEY:-}
+    restart: "no"
+    command: ["python", "scripts/auto_train.py", "--config", "configs/small.yaml", "--iterations", "50"]
+
+  nginx:
+    image: nginx:alpine
+    container_name: minigpt-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - minigpt-api
+    restart: unless-stopped
+
+volumes:
+  minigpt-logs:
+  minigpt-experiments:

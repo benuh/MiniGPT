@@ -1,0 +1,45 @@
+# Specialized Docker image for training MiniGPT models
+
+FROM python:3.9-slim
+
+# Set environment variables
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONPATH=/app/src
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    gcc \
+    g++ \
+    git \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create app user
+RUN groupadd -g 1000 appgroup && \
+    useradd -u 1000 -g appgroup -d /app -s /bin/bash appuser
+
+# Set up application directory
+WORKDIR /app
+
+# Copy requirements and install Python dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application code
+COPY src/ ./src/
+COPY configs/ ./configs/
+COPY scripts/ ./scripts/
+COPY setup.py ./
+
+# Install the application
+RUN pip install -e .
+
+# Create necessary directories
+RUN mkdir -p data logs checkpoints experiments monitoring && \
+    chown -R appuser:appgroup /app
+
+# Switch to app user
+USER appuser
+
+# Default command
+CMD ["python", "scripts/auto_train.py", "--config", "configs/small.yaml"]
