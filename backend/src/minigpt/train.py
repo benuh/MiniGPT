@@ -1,5 +1,7 @@
 import os
 import yaml
+import json
+import time
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, Dataset
@@ -45,6 +47,23 @@ class Trainer:
         self.config = load_config(config_path)
         self.device = get_device()
 
+        # Training progress tracking
+        self.progress_file = "training_progress.json"
+        self.training_stats = {
+            "status": "initializing",
+            "current_epoch": 0,
+            "total_epochs": self.config['training']['max_epochs'],
+            "current_step": 0,
+            "total_steps": 0,
+            "train_loss": 0.0,
+            "val_loss": 0.0,
+            "learning_rate": float(self.config['training']['learning_rate']),
+            "start_time": time.time(),
+            "estimated_time_remaining": 0,
+            "model_name": f"miniGPT-v{int(time.time())}"
+        }
+        self._save_progress()
+
         self._print_header()
 
         # Initialize tokenizer
@@ -61,10 +80,10 @@ class Trainer:
         print("⚙️  Setting up optimizer...")
         self.optimizer = torch.optim.AdamW(
             self.model.parameters(),
-            lr=self.config['training']['learning_rate'],
-            weight_decay=self.config['training']['weight_decay']
+            lr=float(self.config['training']['learning_rate']),
+            weight_decay=float(self.config['training']['weight_decay'])
         )
-        print(f"   ✅ AdamW optimizer (LR: {self.config['training']['learning_rate']:.2e})")
+        print(f"   ✅ AdamW optimizer (LR: {float(self.config['training']['learning_rate']):.2e})")
 
         # Initialize data loaders
         print("📊 Preparing datasets...")
@@ -84,9 +103,41 @@ class Trainer:
 
         self.global_step = 0
         self.best_val_loss = float('inf')
+        self.current_epoch = 0
+
+        # Calculate total steps for progress tracking
+        self.training_stats["total_steps"] = len(self.train_loader) * self.config['training']['max_epochs']
+        self.training_stats["status"] = "ready"
+        self._save_progress()
 
         print("🚀 Training setup complete!")
         print("=" * 60)
+
+    def _save_progress(self):
+        """Save training progress to JSON file"""
+        try:
+            with open(self.progress_file, 'w') as f:
+                json.dump(self.training_stats, f, indent=2)
+        except Exception as e:
+            print(f"⚠️  Failed to save progress: {e}")
+
+    def _update_progress(self, epoch, step, train_loss=None, val_loss=None):
+        """Update training progress stats"""
+        self.training_stats.update({
+            "current_epoch": epoch,
+            "current_step": step,
+            "train_loss": train_loss if train_loss is not None else self.training_stats["train_loss"],
+            "val_loss": val_loss if val_loss is not None else self.training_stats["val_loss"],
+        })
+
+        # Calculate time estimates
+        elapsed_time = time.time() - self.training_stats["start_time"]
+        if step > 0:
+            time_per_step = elapsed_time / step
+            remaining_steps = self.training_stats["total_steps"] - step
+            self.training_stats["estimated_time_remaining"] = time_per_step * remaining_steps
+
+        self._save_progress()
 
     def _print_header(self):
         """Print training header with configuration info"""
@@ -213,11 +264,17 @@ class Trainer:
                         'global_step': self.global_step
                     })
 
+            # Update progress tracking
+            self._update_progress(self.current_epoch, self.global_step, train_loss=loss.item())
+
             # Validation
             if self.global_step % self.config['logging']['eval_interval'] == 0:
                 print(f"\n      🔍 Running validation at step {self.global_step}...")
                 val_loss = self.validate()
                 self.model.train()
+
+                # Update progress with validation loss
+                self._update_progress(self.current_epoch, self.global_step, train_loss=loss.item(), val_loss=val_loss)
 
                 if val_loss < self.best_val_loss:
                     improvement = self.best_val_loss - val_loss
@@ -278,6 +335,7 @@ class Trainer:
         start_time = time.time()
 
         for epoch in range(self.config['training']['max_epochs']):
+            self.current_epoch = epoch + 1
             epoch_start = time.time()
 
             print(f"\n📅 Epoch {epoch + 1}/{self.config['training']['max_epochs']}")

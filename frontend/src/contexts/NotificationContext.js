@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState } from 'react';
-import { Snackbar, Alert } from '@mui/material';
+import TailwindNotification from '../components/TailwindNotification';
 
 const NotificationContext = createContext();
 
@@ -88,28 +88,22 @@ export const NotificationProvider = ({ children }) => {
       {children}
 
       {/* Render notifications */}
-      {notifications.map((notification) => (
-        <Snackbar
-          key={notification.id}
-          open={notification.open}
-          autoHideDuration={notification.duration}
-          onClose={() => hideNotification(notification.id)}
-          anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
-          sx={{ mt: 8 }}
-        >
-          <Alert
-            onClose={() => hideNotification(notification.id)}
-            severity={notification.severity}
-            variant="filled"
-            sx={{
-              minWidth: '300px',
-              boxShadow: 3,
-            }}
+      <div className="fixed top-4 right-4 z-50 space-y-2">
+        {notifications.map((notification, index) => (
+          <div
+            key={notification.id}
+            style={{ transform: `translateY(${index * 72}px)` }}
           >
-            {notification.message}
-          </Alert>
-        </Snackbar>
-      ))}
+            <TailwindNotification
+              message={notification.message}
+              type={notification.severity}
+              duration={notification.duration}
+              onClose={() => hideNotification(notification.id)}
+              isVisible={notification.open}
+            />
+          </div>
+        ))}
+      </div>
     </NotificationContext.Provider>
   );
 };

@@ -24,6 +24,8 @@ import {
   Clear as ClearIcon,
   Download as ExportIcon,
 } from '@mui/icons-material';
+import MLTermDialog from '../components/MLTermDialog';
+import MLTermTooltip from '../components/MLTermTooltip';
 
 function Chat() {
   const [messages, setMessages] = useState([
@@ -39,9 +41,22 @@ function Chat() {
   const [temperature, setTemperature] = useState(0.7);
   const [maxTokens, setMaxTokens] = useState(150);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [helpDialog, setHelpDialog] = useState({ open: false, termKey: null });
   const messagesEndRef = useRef(null);
 
   const models = ['MiniGPT-v2', 'MiniGPT-v1', 'MiniGPT-base'];
+
+  const handleLearnMore = (termKey) => {
+    setHelpDialog({ open: true, termKey });
+  };
+
+  const handleCloseHelp = () => {
+    setHelpDialog({ open: false, termKey: null });
+  };
+
+  const handleTermClick = (termKey) => {
+    setHelpDialog({ open: true, termKey });
+  };
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -67,6 +82,13 @@ function Chat() {
     setIsGenerating(true);
 
     try {
+      console.log('🔵 Sending chat request:', {
+        message: messageToSend,
+        max_length: maxTokens,
+        temperature: temperature,
+        top_k: 50,
+      });
+
       // Call the real MiniGPT API
       const response = await fetch('http://localhost:8000/chat', {
         method: 'POST',
@@ -81,11 +103,21 @@ function Chat() {
         }),
       });
 
+      console.log('🔵 Response status:', response.status, response.statusText);
+
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        const errorData = await response.json().catch(() => ({}));
+        console.error('❌ API Error:', {
+          status: response.status,
+          statusText: response.statusText,
+          detail: errorData.detail || 'Unknown error'
+        });
+
+        throw new Error(`API Error (${response.status}): ${errorData.detail || response.statusText}`);
       }
 
       const data = await response.json();
+      console.log('✅ API Response:', data);
 
       const botMessage = {
         id: messages.length + 2,
@@ -96,16 +128,27 @@ function Chat() {
 
       setMessages(prev => [...prev, botMessage]);
     } catch (error) {
-      console.error('Error calling API:', error);
+      console.error('❌ Frontend Error:', error);
 
-      const errorMessage = {
+      let errorMessage = '';
+      if (error.name === 'TypeError' && error.message.includes('fetch')) {
+        errorMessage = `🔌 Connection Error: Cannot reach backend at http://localhost:8000\n\nDebugging steps:\n1. Is the backend running? Check the backend terminal\n2. Is it on port 8000? Look for "Uvicorn running on http://0.0.0.0:8000"\n3. Try opening http://localhost:8000 in your browser`;
+      } else if (error.message.includes('503')) {
+        errorMessage = `🤖 Model Not Ready: ${error.message}\n\nDebugging steps:\n1. Train a model first: cd backend && python -m minigpt.train\n2. Or check if model loading failed in backend logs`;
+      } else if (error.message.includes('500')) {
+        errorMessage = `💥 Server Error: ${error.message}\n\nCheck the backend terminal for detailed error logs and stack trace.`;
+      } else {
+        errorMessage = `❌ Unexpected Error: ${error.message}\n\nFull error: ${JSON.stringify(error, Object.getOwnPropertyNames(error), 2)}`;
+      }
+
+      const errorBotMessage = {
         id: messages.length + 2,
         type: 'bot',
-        content: `Sorry, I couldn't process your message. Error: ${error.message}. Make sure the backend is running at http://localhost:8000`,
+        content: errorMessage,
         timestamp: new Date().toLocaleTimeString(),
       };
 
-      setMessages(prev => [...prev, errorMessage]);
+      setMessages(prev => [...prev, errorBotMessage]);
     } finally {
       setIsGenerating(false);
     }
@@ -303,9 +346,16 @@ function Chat() {
               </Box>
 
               <Box mb={3}>
-                <Typography gutterBottom variant="body2">
-                  Temperature: {temperature}
-                </Typography>
+                <Box display="flex" alignItems="center" gap={1} mb={1}>
+                  <Typography gutterBottom variant="body2">
+                    Temperature: {temperature}
+                  </Typography>
+                  <MLTermTooltip
+                    termKey="temperature"
+                    onLearnMore={handleLearnMore}
+                    size="small"
+                  />
+                </Box>
                 <Slider
                   value={temperature}
                   onChange={(e, value) => setTemperature(value)}
@@ -321,9 +371,16 @@ function Chat() {
               </Box>
 
               <Box mb={3}>
-                <Typography gutterBottom variant="body2">
-                  Max Tokens: {maxTokens}
-                </Typography>
+                <Box display="flex" alignItems="center" gap={1} mb={1}>
+                  <Typography gutterBottom variant="body2">
+                    Max Tokens: {maxTokens}
+                  </Typography>
+                  <MLTermTooltip
+                    termKey="max_tokens"
+                    onLearnMore={handleLearnMore}
+                    size="small"
+                  />
+                </Box>
                 <Slider
                   value={maxTokens}
                   onChange={(e, value) => setMaxTokens(value)}
@@ -371,6 +428,14 @@ function Chat() {
           </Card>
         </Box>
       </Box>
+
+      {/* ML Terms Help Dialog */}
+      <MLTermDialog
+        termKey={helpDialog.termKey}
+        open={helpDialog.open}
+        onClose={handleCloseHelp}
+        onTermClick={handleTermClick}
+      />
     </Box>
   );
 }

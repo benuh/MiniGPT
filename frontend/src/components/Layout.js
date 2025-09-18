@@ -29,6 +29,7 @@ import {
 const drawerWidth = 240;
 
 const navigationItems = [
+  { text: 'Getting Started', icon: <RobotIcon />, path: '/getting-started' },
   { text: 'Dashboard', icon: <DashboardIcon />, path: '/dashboard' },
   { text: 'Training', icon: <TrainingIcon />, path: '/training' },
   { text: 'Chat', icon: <ChatIcon />, path: '/chat' },

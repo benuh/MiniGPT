@@ -4,6 +4,7 @@ Provides REST API endpoints for text generation and model management
 """
 
 import os
+import json
 import asyncio
 from typing import List, Optional, Dict, Any
 from pathlib import Path
@@ -70,6 +71,20 @@ class HealthResponse(BaseModel):
     model_loaded: bool
     device: str
     memory_usage: Optional[Dict[str, float]] = None
+
+
+class TrainingProgressResponse(BaseModel):
+    status: str
+    current_epoch: int
+    total_epochs: int
+    current_step: int
+    total_steps: int
+    train_loss: float
+    val_loss: float
+    learning_rate: float
+    estimated_time_remaining: float
+    model_name: str
+    progress_percentage: float
 
 
 # Global model instance
@@ -285,25 +300,39 @@ async def generate_text(request: GenerationRequest):
 @app.post("/chat", response_model=ChatResponse)
 async def chat(message: ChatMessage):
     """Single-turn chat with the model"""
+    logger.info(f"🔵 Chat request received: '{message.message}' (temp={message.temperature}, max_len={message.max_length})")
+
     if not model_manager or not model_manager.is_ready():
-        raise HTTPException(status_code=503, detail="No model loaded")
+        logger.error("❌ No model loaded or model not ready")
+        raise HTTPException(status_code=503, detail="No model loaded. Please train a model first.")
 
-    import time
-    start_time = time.time()
+    try:
+        import time
+        start_time = time.time()
 
-    response_text = model_manager.generate_text(
-        message.message,
-        message.max_length,
-        message.temperature,
-        message.top_k
-    )["generated_text"]
+        logger.info(f"🤖 Generating response...")
+        result = model_manager.generate_text(
+            message.message,
+            message.max_length,
+            message.temperature,
+            message.top_k
+        )
 
-    generation_time = time.time() - start_time
+        response_text = result["generated_text"]
+        generation_time = time.time() - start_time
 
-    return ChatResponse(
-        response=response_text,
-        generation_time=generation_time
-    )
+        logger.info(f"✅ Response generated in {generation_time:.2f}s: '{response_text[:50]}{'...' if len(response_text) > 50 else ''}'")
+
+        return ChatResponse(
+            response=response_text,
+            generation_time=generation_time
+        )
+
+    except Exception as e:
+        error_msg = f"Error generating response: {str(e)}"
+        logger.error(f"❌ {error_msg}")
+        logger.exception("Full error traceback:")
+        raise HTTPException(status_code=500, detail=error_msg)
 
 
 @app.get("/generate/stream")
@@ -334,6 +363,32 @@ async def stream_generate(
 
 
 # Utility endpoints
+@app.get("/training/progress", response_model=TrainingProgressResponse)
+async def get_training_progress():
+    """Get current training progress"""
+    progress_file = "training_progress.json"
+
+    if not Path(progress_file).exists():
+        raise HTTPException(status_code=404, detail="No training in progress")
+
+    try:
+        with open(progress_file, 'r') as f:
+            progress_data = json.load(f)
+
+        # Calculate progress percentage
+        if progress_data["total_steps"] > 0:
+            progress_percentage = (progress_data["current_step"] / progress_data["total_steps"]) * 100
+        else:
+            progress_percentage = 0.0
+
+        return TrainingProgressResponse(
+            **progress_data,
+            progress_percentage=progress_percentage
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to read training progress: {str(e)}")
+
+
 @app.get("/")
 async def root():
     """Root endpoint with API information"""
@@ -346,6 +401,7 @@ async def root():
             "generate": "/generate",
             "chat": "/chat",
             "model_info": "/model/info",
+            "training_progress": "/training/progress",
             "docs": "/docs"
         }
     }

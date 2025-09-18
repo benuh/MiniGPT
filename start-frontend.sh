@@ -12,6 +12,17 @@ if [ ! -d "node_modules" ]; then
     npm install
 fi
 
+# Check if Tailwind packages are installed correctly
+echo "🔧 Checking Tailwind CSS installation..."
+if [ ! -d "node_modules/tailwindcss" ]; then
+    echo "📦 Installing Tailwind CSS..."
+    npm install -D tailwindcss@3.4.16 postcss autoprefixer @tailwindcss/forms @tailwindcss/typography
+fi
+
+# Clear cache to ensure fresh build
+echo "🧹 Clearing build cache..."
+rm -rf .next build dist
+
 # Start the development server
 echo "🌐 Starting React development server..."
 echo "Frontend will be available at: http://localhost:3001"

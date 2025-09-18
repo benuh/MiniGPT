@@ -1,0 +1,13 @@
+{
+  "status": "ready",
+  "current_epoch": 2,
+  "total_epochs": 10,
+  "current_step": 1042,
+  "total_steps": 7430,
+  "train_loss": 2.1821961402893066,
+  "val_loss": 2.2963010119153306,
+  "learning_rate": 0.0003,
+  "start_time": 1758234386.290028,
+  "estimated_time_remaining": 2364.2548437887326,
+  "model_name": "miniGPT-v1758234386"
+}

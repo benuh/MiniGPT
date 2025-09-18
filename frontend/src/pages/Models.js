@@ -1,39 +1,14 @@
 import React, { useState } from 'react';
 import {
-  Box,
-  Card,
-  CardContent,
-  Typography,
-  Grid,
-  Button,
-  Chip,
-  IconButton,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Paper,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  TextField,
-  LinearProgress,
-} from '@mui/material';
-import {
-  PlayArrow as DeployIcon,
-  Stop as StopIcon,
-  Delete as DeleteIcon,
-  Download as DownloadIcon,
-  Upload as UploadIcon,
-  Visibility as ViewIcon,
-  Edit as EditIcon,
-  Add as AddIcon,
-} from '@mui/icons-material';
+  PlayIcon,
+  StopIcon,
+  CogIcon,
+  ChartBarIcon,
+  TrainingIcon,
+  DataIcon
+} from '../components/Icons';
 
-function Models() {
+const Models = () => {
   const [models, setModels] = useState([
     {
       id: 1,
@@ -51,323 +26,349 @@ function Models() {
       name: 'MiniGPT-v1',
       version: '1.0.0',
       status: 'Inactive',
-      accuracy: '91.8%',
-      size: '110 MB',
+      accuracy: '89.7%',
+      size: '98 MB',
       created: '1 day ago',
       lastTrained: '1 day ago',
-      parameters: '45M',
-    },
-    {
-      id: 3,
-      name: 'MiniGPT-base',
-      version: '0.9.0',
-      status: 'Training',
-      accuracy: '89.1%',
-      size: '95 MB',
-      created: '2 days ago',
-      lastTrained: '2 days ago',
-      parameters: '40M',
+      parameters: '35M',
     },
   ]);
 
-  const [openDialog, setOpenDialog] = useState(false);
-  const [dialogType, setDialogType] = useState('');
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [selectedModel, setSelectedModel] = useState(null);
+  const [newModel, setNewModel] = useState({
+    name: '',
+    baseModel: '',
+    description: ''
+  });
 
   const getStatusColor = (status) => {
     switch (status) {
-      case 'Active': return 'success';
-      case 'Training': return 'warning';
-      case 'Inactive': return 'default';
-      default: return 'default';
+      case 'Active': return 'bg-green-100 text-green-800';
+      case 'Training': return 'bg-yellow-100 text-yellow-800';
+      case 'Inactive': return 'bg-gray-100 text-gray-800';
+      default: return 'bg-gray-100 text-gray-800';
     }
   };
 
-  const handleAction = (action, model) => {
-    setSelectedModel(model);
-    setDialogType(action);
-    setOpenDialog(true);
-  };
-
-  const handleCloseDialog = () => {
-    setOpenDialog(false);
-    setSelectedModel(null);
-    setDialogType('');
-  };
-
-  const handleModelAction = () => {
-    // Simulate action
-    if (dialogType === 'deploy' && selectedModel) {
-      setModels(prev => prev.map(model =>
-        model.id === selectedModel.id
-          ? { ...model, status: 'Active' }
-          : { ...model, status: 'Inactive' }
-      ));
-    } else if (dialogType === 'delete' && selectedModel) {
-      setModels(prev => prev.filter(model => model.id !== selectedModel.id));
+  const handleCreateModel = () => {
+    if (newModel.name && newModel.baseModel) {
+      const model = {
+        id: models.length + 1,
+        name: newModel.name,
+        version: '1.0.0',
+        status: 'Training',
+        accuracy: 'Training...',
+        size: 'N/A',
+        created: 'Just now',
+        lastTrained: 'Just now',
+        parameters: 'N/A',
+      };
+      setModels([...models, model]);
+      setNewModel({ name: '', baseModel: '', description: '' });
+      setShowCreateDialog(false);
     }
-    handleCloseDialog();
+  };
+
+  const handleDeleteModel = () => {
+    if (selectedModel) {
+      setModels(models.filter(model => model.id !== selectedModel.id));
+      setShowDeleteDialog(false);
+      setSelectedModel(null);
+    }
+  };
+
+  const handleDeployModel = (model) => {
+    setModels(prev => prev.map(m =>
+      m.id === model.id
+        ? { ...m, status: 'Active' }
+        : { ...m, status: 'Inactive' }
+    ));
   };
 
   return (
-    <Box>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
-        <Typography variant="h4" fontWeight="bold">
-          Model Management
-        </Typography>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => handleAction('create', null)}
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-oxford-charcoal">Models</h1>
+          <p className="text-oxford-gray mt-2">Manage and deploy your trained MiniGPT models</p>
+        </div>
+        <button
+          onClick={() => setShowCreateDialog(true)}
+          className="btn-primary flex items-center space-x-2"
         >
-          New Model
-        </Button>
-      </Box>
+          <TrainingIcon className="w-5 h-5" />
+          <span>Create New Model</span>
+        </button>
+      </div>
 
-      <Grid container spacing={3} mb={4}>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Typography color="textSecondary" gutterBottom variant="body2">
-                Total Models
-              </Typography>
-              <Typography variant="h4" fontWeight="bold">
-                {models.length}
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Typography color="textSecondary" gutterBottom variant="body2">
-                Active Models
-              </Typography>
-              <Typography variant="h4" fontWeight="bold">
-                {models.filter(m => m.status === 'Active').length}
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Typography color="textSecondary" gutterBottom variant="body2">
-                Training
-              </Typography>
-              <Typography variant="h4" fontWeight="bold">
-                {models.filter(m => m.status === 'Training').length}
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Typography color="textSecondary" gutterBottom variant="body2">
-                Best Accuracy
-              </Typography>
-              <Typography variant="h4" fontWeight="bold">
-                94.2%
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
+      {/* Model Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="card">
+          <div className="card-body">
+            <div className="flex items-center">
+              <div className="p-3 bg-oxford-blue bg-opacity-10 rounded-lg">
+                <ChartBarIcon className="w-6 h-6 text-oxford-blue" />
+              </div>
+              <div className="ml-4">
+                <div className="text-2xl font-bold text-oxford-charcoal">{models.length}</div>
+                <div className="text-sm text-gray-600">Total Models</div>
+              </div>
+            </div>
+          </div>
+        </div>
 
-      <Card>
-        <CardContent>
-          <Typography variant="h6" fontWeight="bold" mb={2}>
-            Models
-          </Typography>
-          <TableContainer component={Paper} variant="outlined">
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableCell><strong>Name</strong></TableCell>
-                  <TableCell><strong>Version</strong></TableCell>
-                  <TableCell><strong>Status</strong></TableCell>
-                  <TableCell><strong>Accuracy</strong></TableCell>
-                  <TableCell><strong>Size</strong></TableCell>
-                  <TableCell><strong>Parameters</strong></TableCell>
-                  <TableCell><strong>Created</strong></TableCell>
-                  <TableCell align="center"><strong>Actions</strong></TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
+        <div className="card">
+          <div className="card-body">
+            <div className="flex items-center">
+              <div className="p-3 bg-green-100 rounded-lg">
+                <PlayIcon className="w-6 h-6 text-green-600" />
+              </div>
+              <div className="ml-4">
+                <div className="text-2xl font-bold text-oxford-charcoal">
+                  {models.filter(m => m.status === 'Active').length}
+                </div>
+                <div className="text-sm text-gray-600">Active Models</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="card-body">
+            <div className="flex items-center">
+              <div className="p-3 bg-yellow-100 rounded-lg">
+                <TrainingIcon className="w-6 h-6 text-yellow-600" />
+              </div>
+              <div className="ml-4">
+                <div className="text-2xl font-bold text-oxford-charcoal">
+                  {models.filter(m => m.status === 'Training').length}
+                </div>
+                <div className="text-sm text-gray-600">Training</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="card-body">
+            <div className="flex items-center">
+              <div className="p-3 bg-oxford-gold bg-opacity-20 rounded-lg">
+                <DataIcon className="w-6 h-6 text-oxford-gold" />
+              </div>
+              <div className="ml-4">
+                <div className="text-2xl font-bold text-oxford-charcoal">
+                  {models.reduce((total, model) => {
+                    const size = parseInt(model.size);
+                    return total + (isNaN(size) ? 0 : size);
+                  }, 0)} MB
+                </div>
+                <div className="text-sm text-gray-600">Total Size</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Models Table */}
+      <div className="card">
+        <div className="card-header">
+          <div className="flex items-center space-x-3">
+            <ChartBarIcon className="w-6 h-6 text-oxford-blue" />
+            <h2 className="text-xl font-semibold text-oxford-charcoal">Model Library</h2>
+          </div>
+        </div>
+        <div className="card-body p-0">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-oxford-gray-warm">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                    Model
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                    Performance
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                    Details
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
                 {models.map((model) => (
-                  <TableRow key={model.id} hover>
-                    <TableCell>
-                      <Typography fontWeight="bold">{model.name}</Typography>
-                    </TableCell>
-                    <TableCell>{model.version}</TableCell>
-                    <TableCell>
-                      <Chip
-                        label={model.status}
-                        color={getStatusColor(model.status)}
-                        size="small"
-                      />
-                    </TableCell>
-                    <TableCell>{model.accuracy}</TableCell>
-                    <TableCell>{model.size}</TableCell>
-                    <TableCell>{model.parameters}</TableCell>
-                    <TableCell>{model.created}</TableCell>
-                    <TableCell align="center">
-                      <Box display="flex" gap={1} justifyContent="center">
-                        <IconButton
-                          size="small"
-                          color="primary"
-                          onClick={() => handleAction('view', model)}
+                  <tr key={model.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div>
+                        <div className="text-sm font-medium text-oxford-charcoal">{model.name}</div>
+                        <div className="text-sm text-gray-500">v{model.version}</div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`badge ${getStatusColor(model.status)}`}>
+                        {model.status}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-oxford-charcoal">{model.accuracy}</div>
+                      <div className="text-sm text-gray-500">{model.parameters} params</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-oxford-charcoal">{model.size}</div>
+                      <div className="text-sm text-gray-500">Created {model.created}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <div className="flex items-center space-x-2">
+                        {model.status !== 'Active' && (
+                          <button
+                            onClick={() => handleDeployModel(model)}
+                            className="text-green-600 hover:text-green-900 p-1 rounded"
+                            title="Deploy Model"
+                          >
+                            <PlayIcon className="w-4 h-4" />
+                          </button>
+                        )}
+                        {model.status === 'Active' && (
+                          <button
+                            onClick={() => setModels(prev => prev.map(m =>
+                              m.id === model.id ? { ...m, status: 'Inactive' } : m
+                            ))}
+                            className="text-red-600 hover:text-red-900 p-1 rounded"
+                            title="Stop Model"
+                          >
+                            <StopIcon className="w-4 h-4" />
+                          </button>
+                        )}
+                        <button
+                          onClick={() => {
+                            setSelectedModel(model);
+                            setShowDeleteDialog(true);
+                          }}
+                          className="text-red-600 hover:text-red-900 p-1 rounded"
+                          title="Delete Model"
                         >
-                          <ViewIcon fontSize="small" />
-                        </IconButton>
-                        <IconButton
-                          size="small"
-                          color="primary"
-                          onClick={() => handleAction('deploy', model)}
-                          disabled={model.status === 'Training'}
-                        >
-                          {model.status === 'Active' ? <StopIcon fontSize="small" /> : <DeployIcon fontSize="small" />}
-                        </IconButton>
-                        <IconButton
-                          size="small"
-                          color="primary"
-                          onClick={() => handleAction('download', model)}
-                        >
-                          <DownloadIcon fontSize="small" />
-                        </IconButton>
-                        <IconButton
-                          size="small"
-                          color="error"
-                          onClick={() => handleAction('delete', model)}
-                          disabled={model.status === 'Active'}
-                        >
-                          <DeleteIcon fontSize="small" />
-                        </IconButton>
-                      </Box>
-                    </TableCell>
-                  </TableRow>
+                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+                          </svg>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
                 ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </CardContent>
-      </Card>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
 
-      <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
-        <DialogTitle>
-          {dialogType === 'deploy' && `Deploy ${selectedModel?.name}`}
-          {dialogType === 'delete' && `Delete ${selectedModel?.name}`}
-          {dialogType === 'view' && `Model Details: ${selectedModel?.name}`}
-          {dialogType === 'download' && `Download ${selectedModel?.name}`}
-          {dialogType === 'create' && 'Create New Model'}
-        </DialogTitle>
-        <DialogContent>
-          {dialogType === 'deploy' && (
-            <Typography>
-              Are you sure you want to deploy this model? This will make it the active model for chat and API requests.
-            </Typography>
-          )}
-          {dialogType === 'delete' && (
-            <Typography color="error">
-              Are you sure you want to delete this model? This action cannot be undone.
-            </Typography>
-          )}
-          {dialogType === 'view' && selectedModel && (
-            <Box>
-              <Grid container spacing={2}>
-                <Grid item xs={6}>
-                  <Typography variant="body2" color="textSecondary">Name:</Typography>
-                  <Typography variant="body1" fontWeight="bold">{selectedModel.name}</Typography>
-                </Grid>
-                <Grid item xs={6}>
-                  <Typography variant="body2" color="textSecondary">Version:</Typography>
-                  <Typography variant="body1">{selectedModel.version}</Typography>
-                </Grid>
-                <Grid item xs={6}>
-                  <Typography variant="body2" color="textSecondary">Status:</Typography>
-                  <Chip label={selectedModel.status} color={getStatusColor(selectedModel.status)} size="small" />
-                </Grid>
-                <Grid item xs={6}>
-                  <Typography variant="body2" color="textSecondary">Accuracy:</Typography>
-                  <Typography variant="body1">{selectedModel.accuracy}</Typography>
-                </Grid>
-                <Grid item xs={6}>
-                  <Typography variant="body2" color="textSecondary">Size:</Typography>
-                  <Typography variant="body1">{selectedModel.size}</Typography>
-                </Grid>
-                <Grid item xs={6}>
-                  <Typography variant="body2" color="textSecondary">Parameters:</Typography>
-                  <Typography variant="body1">{selectedModel.parameters}</Typography>
-                </Grid>
-                <Grid item xs={12}>
-                  <Typography variant="body2" color="textSecondary">Last Trained:</Typography>
-                  <Typography variant="body1">{selectedModel.lastTrained}</Typography>
-                </Grid>
-              </Grid>
-            </Box>
-          )}
-          {dialogType === 'download' && (
-            <Box>
-              <Typography mb={2}>
-                Download {selectedModel?.name} model files
-              </Typography>
-              <LinearProgress variant="determinate" value={0} />
-              <Typography variant="caption" color="textSecondary" mt={1}>
-                Ready to download
-              </Typography>
-            </Box>
-          )}
-          {dialogType === 'create' && (
-            <Box>
-              <TextField
-                fullWidth
-                label="Model Name"
-                margin="normal"
-                placeholder="e.g., MiniGPT-v3"
-              />
-              <TextField
-                fullWidth
-                label="Base Model"
-                margin="normal"
-                select
-                SelectProps={{ native: true }}
+      {/* Create Model Dialog */}
+      {showCreateDialog && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-oxford-charcoal">Create New Model</h3>
+            </div>
+            <div className="px-6 py-4 space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Model Name
+                </label>
+                <input
+                  type="text"
+                  value={newModel.name}
+                  onChange={(e) => setNewModel({...newModel, name: e.target.value})}
+                  placeholder="e.g., MiniGPT-v3"
+                  className="input-field"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Base Model
+                </label>
+                <select
+                  value={newModel.baseModel}
+                  onChange={(e) => setNewModel({...newModel, baseModel: e.target.value})}
+                  className="input-field"
+                >
+                  <option value="">Select base model</option>
+                  <option value="scratch">Train from scratch</option>
+                  <option value="minigpt-v2">Based on MiniGPT-v2</option>
+                  <option value="minigpt-v1">Based on MiniGPT-v1</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Description
+                </label>
+                <textarea
+                  value={newModel.description}
+                  onChange={(e) => setNewModel({...newModel, description: e.target.value})}
+                  placeholder="Describe this model..."
+                  rows={3}
+                  className="input-field resize-none"
+                />
+              </div>
+            </div>
+            <div className="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
+              <button
+                onClick={() => setShowCreateDialog(false)}
+                className="btn-secondary"
               >
-                <option value="">Select base model</option>
-                <option value="scratch">Train from scratch</option>
-                <option value="minigpt-v2">Based on MiniGPT-v2</option>
-                <option value="minigpt-v1">Based on MiniGPT-v1</option>
-              </TextField>
-              <TextField
-                fullWidth
-                label="Description"
-                margin="normal"
-                multiline
-                rows={3}
-                placeholder="Describe this model..."
-              />
-            </Box>
-          )}
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseDialog}>
-            Cancel
-          </Button>
-          <Button
-            onClick={handleModelAction}
-            variant="contained"
-            color={dialogType === 'delete' ? 'error' : 'primary'}
-          >
-            {dialogType === 'deploy' && 'Deploy'}
-            {dialogType === 'delete' && 'Delete'}
-            {dialogType === 'download' && 'Download'}
-            {dialogType === 'create' && 'Create'}
-            {dialogType === 'view' && 'Close'}
-          </Button>
-        </DialogActions>
-      </Dialog>
-    </Box>
+                Cancel
+              </button>
+              <button
+                onClick={handleCreateModel}
+                disabled={!newModel.name || !newModel.baseModel}
+                className={`${newModel.name && newModel.baseModel ? 'btn-primary' : 'bg-gray-300 text-gray-500 cursor-not-allowed py-3 px-8 rounded-lg'}`}
+              >
+                Create Model
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Dialog */}
+      {showDeleteDialog && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <h3 className="text-lg font-semibold text-oxford-charcoal">Delete Model</h3>
+            </div>
+            <div className="px-6 py-4">
+              <p className="text-gray-600">
+                Are you sure you want to delete <strong>{selectedModel?.name}</strong>?
+                This action cannot be undone.
+              </p>
+            </div>
+            <div className="px-6 py-4 border-t border-gray-200 flex justify-end space-x-3">
+              <button
+                onClick={() => setShowDeleteDialog(false)}
+                className="btn-secondary"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteModel}
+                className="bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-8 transition duration-200 ease-in-out rounded-lg"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
-}
+};
 
 export default Models;
