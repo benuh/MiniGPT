@@ -112,20 +112,104 @@ python3 -c "import minigpt; print('MiniGPT installed successfully!')"
 
 ```
 MiniGPT/
-├── src/minigpt/           # Main package
-│   ├── model.py          # Transformer architecture
-│   ├── tokenizer.py      # Text tokenization
-│   ├── train.py          # Training pipeline
-│   ├── chat.py           # Inference & chat interface
-│   ├── config.py         # Configuration management
-│   └── utils.py          # Utilities and helpers
-├── configs/              # Model configurations
-│   └── small.yaml        # Small model config
-├── scripts/              # Training and utility scripts
-├── tests/                # Unit tests
-├── data/                 # Dataset storage
-└── checkpoints/          # Model checkpoints
+├── backend/              # Python backend
+│   ├── src/minigpt/      # Main package
+│   │   ├── model.py      # Transformer architecture
+│   │   ├── tokenizer.py  # Text tokenization
+│   │   ├── train.py      # Training pipeline
+│   │   ├── chat.py       # Chat interface
+│   │   ├── api.py        # FastAPI server
+│   │   └── utils.py      # Utilities
+│   ├── configs/          # Model configurations
+│   ├── data/             # Training data
+│   └── checkpoints/      # Model checkpoints
+├── frontend/             # React web interface
+│   ├── src/
+│   │   ├── components/   # React components
+│   │   ├── pages/        # Page components
+│   │   ├── contexts/     # State management
+│   │   └── index.js      # Entry point
+│   ├── public/           # Static files
+│   └── package.json      # Frontend dependencies
+├── start-backend.sh      # Start backend server
+├── start-frontend.sh     # Start frontend dev server
+└── start-all.sh          # Start both services
 ```
+
+## Web Interface
+
+MiniGPT includes a modern React-based web interface that provides a user-friendly alternative to the command-line tools.
+
+### Features
+
+- **Dashboard**: Overview of training progress, models, and system statistics
+- **Training Interface**: Configure and monitor model training with real-time progress
+- **Chat Interface**: Interactive chat with trained models
+- **Model Management**: Deploy, download, and manage trained models
+- **Data Management**: Upload, organize, and manage training datasets
+
+### Quick Start (Web Interface)
+
+#### 🚀 Just Want to Use the App?
+```bash
+./start-all.sh
+```
+Then open [http://localhost:3000](http://localhost:3000) in your browser!
+
+#### 🔧 Development/Debugging?
+Use separate terminals to see logs:
+
+**Terminal 1 - Backend:**
+```bash
+./start-backend.sh
+```
+
+**Terminal 2 - Frontend:**
+```bash
+./start-frontend.sh
+```
+
+**Access the interface:**
+- Frontend: [http://localhost:3000](http://localhost:3000)
+- Backend API: [http://localhost:8000](http://localhost:8000)
+
+### Frontend Development
+
+See `frontend/README.md` for detailed frontend setup, development, and deployment instructions.
+
+## Command Line Usage
+
+For developers who prefer command-line tools:
+
+### Installation
+
+```bash
+cd backend
+pip install -e .
+```
+
+### Training
+
+```bash
+cd backend
+python -m minigpt.train --config configs/small.yaml --epochs 5
+```
+
+### Interactive Chat
+
+```bash
+cd backend
+python -m minigpt.chat
+```
+
+### API Server
+
+```bash
+cd backend
+python -m minigpt.api
+```
+
+See `backend/README.md` for detailed backend documentation.
 
 ## Model Configurations
 
@@ -194,7 +278,11 @@ The interactive chat interface supports these commands:
 - [x] REST API server
 - [x] Docker containerization
 - [x] Continuous improvement automation
+- [x] React web interface with Material-UI
 - [x] Comprehensive documentation
+- [ ] Real-time WebSocket integration
+- [ ] Model deployment automation
+- [ ] Advanced data preprocessing tools
 
 ## Technical Details
 
@@ -263,6 +351,63 @@ python -m minigpt.compare --models checkpoints/*.pt --plots
 ```
 
 For detailed usage instructions, see [USAGE_GUIDE.md](USAGE_GUIDE.md).
+
+## Step-by-Step Procedure (New Terminal)
+
+If you're starting MiniGPT in a fresh terminal session, follow these complete steps:
+
+### Terminal Setup
+```bash
+# 1. Navigate to project directory
+cd path/to/MiniGPT
+
+# 2. Verify location
+pwd
+# Should show: /your/path/to/MiniGPT
+
+# 3. Verify installation
+python -c "import minigpt; print('✅ MiniGPT ready!')"
+# or
+python3 -c "import minigpt; print('✅ MiniGPT ready!')"
+
+# 4. Check available configurations
+ls configs/
+# Should show: small.yaml medium.yaml
+```
+
+### Start Training
+```bash
+# 5. Train your first model (5-10 minutes)
+python -m minigpt.train --config configs/small.yaml
+# or
+python3 -m minigpt.train --config configs/small.yaml
+```
+
+### After Training Completes
+```bash
+# 6. Chat with your trained model
+python -m minigpt.chat --model checkpoints/best_model.pt
+
+# 7. Evaluate model performance
+python scripts/run_evaluation.py
+
+# 8. Start API server (optional)
+python scripts/start_server.py
+# Then visit: http://localhost:8000/docs
+```
+
+### Quick Copy-Paste Commands
+```bash
+cd path/to/MiniGPT
+python -c "import minigpt; print('✅ MiniGPT ready!')"
+ls configs/
+python -m minigpt.train --config configs/small.yaml
+```
+
+### Troubleshooting
+- **"Command not found"**: Use `python3` instead of `python`
+- **"No module found"**: Run `python -m pip install -e .` in the project directory
+- **Wrong directory**: Make sure you're in the MiniGPT project folder
 
 ## Contributing
 
