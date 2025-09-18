@@ -1,8 +1,8 @@
-# MiniGPT 🤖
+# MiniGPT
 
-A minimalist GPT implementation built from scratch for learning and experimentation. This project demonstrates modern ML engineering practices with a clean, educational codebase.
+A minimalist GPT implementation built from scratch for learning and experimentation. This project demonstrates modern ML engineering practices.
 
-## ⚠️ Prerequisites
+## Prerequisites
 
 **Python & Package Manager Setup:**
 
@@ -29,20 +29,20 @@ source ~/.zshrc  # or source ~/.bashrc
 
 ## Features
 
-### 🏗️ Core Architecture
+### Core Architecture
 
 - **Transformer Model**: Clean GPT-style implementation with multi-head attention
 - **Modular Design**: Separate components for attention, MLP, and transformer blocks
 - **Configurable**: Easy to adjust model size and hyperparameters
 
-### 🚀 Training Pipeline
+### Training Pipeline
 
 - **Professional Training Loop**: Complete with validation, checkpointing, and logging
 - **Data Loading**: Efficient batching and preprocessing for text data
 - **Experiment Tracking**: Integration with Weights & Biases
 - **Resumable Training**: Save and resume from checkpoints
 
-### 💬 Inference & Chat
+### Inference & Chat
 
 - **Interactive Chat Interface**: Real-time conversation with your trained model
 - **Flexible Generation**: Configurable temperature, top-k sampling
@@ -103,9 +103,9 @@ python -m minigpt.chat --model checkpoints/best_model.pt --prompt "Hello, how ar
 
 ```bash
 # Verify installation works
-python -c "import minigpt; print('✅ MiniGPT installed successfully!')"
+python -c "import minigpt; print('MiniGPT installed successfully!')"
 # or
-python3 -c "import minigpt; print('✅ MiniGPT installed successfully!')"
+python3 -c "import minigpt; print('MiniGPT installed successfully!')"
 ```
 
 ## Project Structure
