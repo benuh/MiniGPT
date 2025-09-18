@@ -2,6 +2,30 @@
 
 A minimalist GPT implementation built from scratch for learning and experimentation. This project demonstrates modern ML engineering practices with a clean, educational codebase.
 
+## ⚠️ Prerequisites
+
+**Python & Package Manager Setup:**
+
+This project requires Python 3.8+ with pip. Depending on your system, you may need to use `python3` and `pip3` instead of `python` and `pip`.
+
+```bash
+# Check your Python installation
+python --version   # or python3 --version
+pip --version      # or pip3 --version
+
+# If pip is not in PATH, add this to your shell profile (~/.zshrc, ~/.bashrc):
+export PATH="$HOME/Library/Python/3.9/bin:$PATH"  # macOS
+export PATH="$HOME/.local/bin:$PATH"              # Linux
+
+# Then reload your shell:
+source ~/.zshrc  # or source ~/.bashrc
+```
+
+**Note:** Throughout this README:
+- Replace `python` with `python3` if needed
+- Replace `pip` with `pip3` if needed
+- If you see "command not found" errors, ensure the Python scripts are in your PATH
+
 ## Features
 
 ### 🏗️ Core Architecture
@@ -31,16 +55,27 @@ A minimalist GPT implementation built from scratch for learning and experimentat
 ### Installation
 
 ```bash
-git clone https://github.com/benjaminhu/MiniGPT.git
+git clone https://github.com/benuh/MiniGPT.git
 cd MiniGPT
+
+# Install dependencies (use pip3 if pip doesn't work)
 pip install -e .
+# or
+python3 -m pip install -e .
 ```
+
+**Troubleshooting Installation:**
+- If `pip install -e .` fails, try `python3 -m pip install -e .`
+- If you get PATH warnings, add the Python bin directory to your PATH (see Prerequisites above)
+- On macOS, you may need to install Xcode Command Line Tools: `xcode-select --install`
 
 ### Training a Model
 
 ```bash
-# Train with default small config
+# Train with default small config (use python3 if python doesn't work)
 python -m minigpt.train --config configs/small.yaml
+# or
+python3 -m minigpt.train --config configs/small.yaml
 
 # Resume training from checkpoint
 python -m minigpt.train --config configs/small.yaml --resume checkpoints/checkpoint_1000.pt
@@ -49,11 +84,22 @@ python -m minigpt.train --config configs/small.yaml --resume checkpoints/checkpo
 ### Chat with Your Model
 
 ```bash
-# Interactive chat
+# Interactive chat (use python3 if python doesn't work)
 python -m minigpt.chat --model checkpoints/best_model.pt
+# or
+python3 -m minigpt.chat --model checkpoints/best_model.pt
 
 # Single prompt
 python -m minigpt.chat --model checkpoints/best_model.pt --prompt "Hello, how are you?"
+```
+
+### Quick Test After Installation
+
+```bash
+# Verify installation works
+python -c "import minigpt; print('✅ MiniGPT installed successfully!')"
+# or
+python3 -c "import minigpt; print('✅ MiniGPT installed successfully!')"
 ```
 
 ## Project Structure
@@ -134,12 +180,14 @@ The interactive chat interface supports these commands:
 - [x] Training pipeline with checkpointing
 - [x] Interactive chat interface
 - [x] Configuration management
-- [ ] Model evaluation metrics (perplexity, BLEU)
-- [ ] Fine-tuning capabilities
-- [ ] Quantization and optimization
-- [ ] Web interface
-- [ ] Docker containerization
-- [ ] Model serving API
+- [x] Model evaluation metrics (perplexity, BLEU)
+- [x] Advanced training features (LR scheduling, early stopping)
+- [x] Model optimization and quantization
+- [x] Model comparison and A/B testing
+- [x] REST API server
+- [x] Docker containerization
+- [x] Continuous improvement automation
+- [x] Comprehensive documentation
 
 ## Technical Details
 
@@ -159,6 +207,48 @@ The interactive chat interface supports these commands:
 - **Sampling**: Temperature and top-k sampling
 - **Context**: Automatic context window management
 - **Stopping**: Configurable max tokens
+
+## Advanced Usage
+
+### Continuous Improvement System
+```bash
+# Start automated training (runs for 8 hours, then restarts)
+chmod +x scripts/start_continuous.sh
+./scripts/start_continuous.sh
+```
+
+### API Server
+```bash
+# Start REST API server
+python scripts/start_server.py
+# or
+python3 scripts/start_server.py
+
+# Visit http://localhost:8000/docs for API documentation
+```
+
+### Docker Deployment
+```bash
+# Build and run with Docker
+./scripts/docker_build.sh build
+./scripts/docker_build.sh run
+
+# Or use docker-compose
+docker-compose up -d
+```
+
+### Model Evaluation & Comparison
+```bash
+# Evaluate a trained model
+python scripts/run_evaluation.py
+# or
+python3 scripts/run_evaluation.py
+
+# Compare multiple models
+python -m minigpt.compare --models checkpoints/*.pt --plots
+```
+
+For detailed usage instructions, see [USAGE_GUIDE.md](USAGE_GUIDE.md).
 
 ## Contributing
 
@@ -181,3 +271,4 @@ MIT License - feel free to use this for learning and experimentation!
 ---
 
 **Happy experimenting!** 🚀
+
