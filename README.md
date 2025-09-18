@@ -48,7 +48,7 @@ source ~/.zshrc  # or source ~/.bashrc
 - **Flexible Generation**: Configurable temperature, top-k sampling
 - **Command System**: Built-in commands for adjusting generation parameters
 
-### 🔧 ML Engineering Best Practices
+### ML Engineering Best Practices
 
 - **Configuration Management**: YAML-based configs for reproducible experiments
 - **Device Agnostic**: Automatic GPU/MPS/CPU detection
