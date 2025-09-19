@@ -58,6 +58,12 @@ from .optimize import ModelOptimizer
 # Model comparison
 from .compare import ModelComparator
 
+# Pre-trained models
+from .pretrained import PretrainedModelImporter, import_pretrained_model, list_available_models
+
+# Remote models
+from .remote import RemoteModelManager, RemoteChatBot, list_remote_models
+
 # API server (optional import)
 try:
     from .api import ModelManager
@@ -123,6 +129,16 @@ __all__ = [
     # Comparison
     "ModelComparator",
 
+    # Pre-trained models
+    "PretrainedModelImporter",
+    "import_pretrained_model",
+    "list_available_models",
+
+    # Remote models
+    "RemoteModelManager",
+    "RemoteChatBot",
+    "list_remote_models",
+
     # API (if available)
     "ModelManager",
 ]
@@ -169,6 +185,16 @@ def quick_evaluate(model_path: str):
     ]
 
     return evaluator.comprehensive_evaluation(test_texts, prompts)
+
+def quick_import_model(model_key: str):
+    """Quick import of a pre-trained model"""
+    return import_pretrained_model(model_key)
+
+def quick_remote_chat(model_key: str):
+    """Quick chat with a remote model"""
+    chatbot = RemoteChatBot(model_key)
+    chatbot.chat_loop()
+    return chatbot
 
 # Package info
 def get_info():

@@ -113,6 +113,7 @@ function DataManagement() {
   const handleDatasetAction = () => {
     if (dialogType === 'delete' && selectedDataset) {
       setDatasets(prev => prev.filter(dataset => dataset.id !== selectedDataset.id));
+      alert(`Dataset "${selectedDataset.name}" deleted successfully!`);
     } else if (dialogType === 'upload') {
       // Add new dataset
       const newDataset = {
@@ -126,6 +127,21 @@ function DataManagement() {
         lastUsed: 'Never',
       };
       setDatasets(prev => [...prev, newDataset]);
+      alert('Dataset uploaded successfully!');
+    } else if (dialogType === 'edit' && selectedDataset) {
+      alert(`Dataset "${selectedDataset.name}" updated successfully!`);
+    } else if (dialogType === 'download' && selectedDataset) {
+      // Simulate download
+      const element = document.createElement('a');
+      const file = new Blob([`Sample content from ${selectedDataset.name}`], { type: 'text/plain' });
+      element.href = URL.createObjectURL(file);
+      element.download = selectedDataset.name;
+      document.body.appendChild(element);
+      element.click();
+      document.body.removeChild(element);
+      alert(`Dataset "${selectedDataset.name}" downloaded successfully!`);
+    } else if (dialogType === 'view') {
+      // View action already handled by the dialog content
     }
     handleCloseDialog();
   };

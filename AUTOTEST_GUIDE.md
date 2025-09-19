@@ -4,6 +4,14 @@ Complete automation system for MiniGPT training, testing, and deployment.
 
 ## Quick Start
 
+### 🚀 **Option 1: Instant AI (No Training)**
+```bash
+cd backend
+pip install -e .
+python -m minigpt.chat --remote hf:gpt2
+```
+
+### 🎯 **Option 2: Complete Automation**
 ```bash
 # 1. Run quick setup check first
 python quick_setup_check.py
@@ -13,6 +21,11 @@ python autoTest.py --dry-run
 
 # 3. Run full automation
 python autoTest.py
+```
+
+### 🎮 **Option 3: Use Pre-trained Models**
+```bash
+python autoTest.py --use-pretrained
 ```
 
 ## What AutoTest Does
@@ -359,6 +372,22 @@ docker-compose -f docker-compose.prod.yml up -d
 Once AutoTest completes successfully:
 
 ### 1. Start Using MiniGPT
+
+#### 🌐 **Remote Models (Instant)**
+```bash
+# List available remote models
+python -m minigpt.chat --list-remote
+
+# Chat with free models
+python -m minigpt.chat --remote hf:gpt2
+python -m minigpt.chat --remote hf:gpt-neo-1.3b
+
+# Premium models (API key required)
+export OPENAI_API_KEY="your-key"
+python -m minigpt.chat --remote openai:gpt-3.5-turbo
+```
+
+#### 🎯 **Local Models**
 ```bash
 # All-in-one startup
 ./start-all.sh

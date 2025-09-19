@@ -57,55 +57,57 @@ source ~/.zshrc  # or source ~/.bashrc
 
 ## Quick Start
 
-### Installation
+### 🚀 **Instant AI (No Training Required)**
 
 ```bash
 git clone https://github.com/benuh/MiniGPT.git
-cd MiniGPT
-
-# Install dependencies (use pip3 if pip doesn't work)
+cd MiniGPT/backend
 pip install -e .
-# or
-python3 -m pip install -e .
+
+# Start chatting immediately with world-class models
+python -m minigpt.chat --remote hf:gpt2          # Free GPT-2
+python -m minigpt.chat --remote hf:gpt-neo-1.3b  # Free high-quality
+python -m minigpt.chat --remote openai:gpt-3.5-turbo  # Premium (API key needed)
 ```
 
-**Troubleshooting Installation:**
+### 🎯 **Three Ways to Use MiniGPT**
+
+#### **Option 1: Remote Models (Instant)**
+```bash
+# No downloads, no training - start chatting now
+python -m minigpt.chat --list-remote             # See all options
+python -m minigpt.chat --remote hf:gpt2          # Free & instant
+```
+
+#### **Option 2: Complete Automation**
+```bash
+# Full pipeline: setup → train → test → deploy
+python autoTest.py
+```
+
+#### **Option 3: Manual Training**
+```bash
+# Train your own personalized model
+cd backend
+python -m minigpt.train --config configs/small.yaml
+python -m minigpt.chat  # Chat with your trained model
+```
+
+### **Troubleshooting Installation:**
 
 - If `pip install -e .` fails, try `python3 -m pip install -e .`
 - If you get PATH warnings, add the Python bin directory to your PATH (see Prerequisites above)
 - On macOS, you may need to install Xcode Command Line Tools: `xcode-select --install`
 
-### Training a Model
-
-```bash
-# Train with default small config (use python3 if python doesn't work)
-python -m minigpt.train --config configs/small.yaml
-# or
-python3 -m minigpt.train --config configs/small.yaml
-
-# Resume training from checkpoint
-python -m minigpt.train --config configs/small.yaml --resume checkpoints/checkpoint_1000.pt
-```
-
-### Chat with Your Model
-
-```bash
-# Interactive chat (use python3 if python doesn't work)
-python -m minigpt.chat --model checkpoints/best_model.pt
-# or
-python3 -m minigpt.chat --model checkpoints/best_model.pt
-
-# Single prompt
-python -m minigpt.chat --model checkpoints/best_model.pt --prompt "Hello, how are you?"
-```
-
 ### Quick Test After Installation
 
 ```bash
-# Verify installation works
+# Option 1: Test with remote model (instant)
+cd backend
+python -m minigpt.chat --remote hf:gpt2 --prompt "Hello world!"
+
+# Option 2: Verify installation
 python -c "import minigpt; print('MiniGPT installed successfully!')"
-# or
-python3 -c "import minigpt; print('MiniGPT installed successfully!')"
 ```
 
 ## Project Structure

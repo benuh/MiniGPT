@@ -732,9 +732,10 @@ class FrontendTester:
 class AutoTest:
     """Main automation orchestrator"""
 
-    def __init__(self, config_name: str = "small", dry_run: bool = False):
+    def __init__(self, config_name: str = "small", dry_run: bool = False, use_pretrained: str = None):
         self.config_name = config_name
         self.dry_run = dry_run
+        self.use_pretrained = use_pretrained
         self.logger = AutoTestLogger()
 
         # Initialize components
@@ -757,14 +758,24 @@ class AutoTest:
             self._preview_pipeline()
             return True
 
-        pipeline_steps = [
-            ("System Check", self._run_system_check),
-            ("Data Preparation", self._run_data_preparation),
-            ("Model Training", self._run_model_training),
-            ("Backend Testing", self._run_backend_testing),
-            ("Frontend Testing", self._run_frontend_testing),
-            ("Integration Testing", self._run_integration_testing)
-        ]
+        # Adjust pipeline based on whether using pre-trained model
+        if self.use_pretrained:
+            pipeline_steps = [
+                ("System Check", self._run_system_check),
+                ("Pre-trained Model Import", self._run_pretrained_import),
+                ("Backend Testing", self._run_backend_testing),
+                ("Frontend Testing", self._run_frontend_testing),
+                ("Integration Testing", self._run_integration_testing)
+            ]
+        else:
+            pipeline_steps = [
+                ("System Check", self._run_system_check),
+                ("Data Preparation", self._run_data_preparation),
+                ("Model Training", self._run_model_training),
+                ("Backend Testing", self._run_backend_testing),
+                ("Frontend Testing", self._run_frontend_testing),
+                ("Integration Testing", self._run_integration_testing)
+            ]
 
         for step_name, step_func in pipeline_steps:
             self.logger.step(f"Running: {step_name}")
@@ -802,6 +813,7 @@ class AutoTest:
             "system": self._run_system_check,
             "data": self._run_data_preparation,
             "train": self._run_model_training,
+            "pretrained": self._run_pretrained_import,
             "backend": self._run_backend_testing,
             "frontend": self._run_frontend_testing,
             "integration": self._run_integration_testing
@@ -849,6 +861,34 @@ class AutoTest:
         """Run frontend testing"""
         return self.frontend_tester.test_frontend()
 
+    def _run_pretrained_import(self) -> bool:
+        """Import a pre-trained model"""
+        if not self.use_pretrained:
+            self.logger.error("No pre-trained model specified")
+            return False
+
+        try:
+            sys.path.insert(0, 'backend/src')
+            from minigpt.pretrained import import_pretrained_model, list_available_models
+
+            available_models = list_available_models()
+            if self.use_pretrained not in available_models:
+                self.logger.error(f"Model {self.use_pretrained} not available")
+                self.logger.info(f"Available models: {', '.join(available_models.keys())}")
+                return False
+
+            self.logger.info(f"Importing pre-trained model: {self.use_pretrained}")
+            model_info = available_models[self.use_pretrained]
+            self.logger.info(f"Model size: {model_info['size']}, Description: {model_info['description']}")
+
+            checkpoint_path = import_pretrained_model(self.use_pretrained)
+            self.logger.success(f"✅ Pre-trained model imported: {checkpoint_path}")
+            return True
+
+        except Exception as e:
+            self.logger.error(f"Failed to import pre-trained model: {str(e)}")
+            return False
+
     def _run_integration_testing(self) -> bool:
         """Run integration testing"""
         self.logger.info("Running integration tests...")
@@ -857,41 +897,72 @@ class AutoTest:
 
     def _preview_pipeline(self):
         """Show what would be executed in dry run mode"""
-        steps = [
-            "1. System Requirements Check",
-            "   - Python version validation",
-            "   - Package dependencies verification",
-            "   - Directory structure validation",
-            "   - Node.js/npm availability",
-            "",
-            "2. Data Preparation",
-            f"   - Load {self.config_name} configuration",
-            "   - Download and prepare training dataset",
-            "   - Validate data quality",
-            "",
-            "3. Model Training",
-            "   - Backup existing checkpoints",
-            "   - Train model for 3 epochs (test mode)",
-            "   - Monitor training progress",
-            "   - Validate training outputs",
-            "",
-            "4. Backend Testing",
-            "   - Test model loading",
-            "   - Test chat interface",
-            "   - Test API server",
-            "   - Test model evaluation",
-            "",
-            "5. Frontend Testing",
-            "   - Install npm dependencies",
-            "   - Test build process",
-            "   - Test development server",
-            "   - Test frontend-backend integration",
-            "",
-            "6. Integration Testing",
-            "   - End-to-end workflow validation",
-            "   - Performance benchmarking",
-            "   - Generate comprehensive report"
-        ]
+        if self.use_pretrained:
+            steps = [
+                "1. System Requirements Check",
+                "   - Python version validation",
+                "   - Package dependencies verification",
+                "   - Directory structure validation",
+                "   - Node.js/npm availability",
+                "",
+                "2. Pre-trained Model Import",
+                f"   - Import {self.use_pretrained} model",
+                "   - Convert to MiniGPT format",
+                "   - Save to checkpoints directory",
+                "",
+                "3. Backend Testing",
+                "   - Test model loading",
+                "   - Test chat interface",
+                "   - Test API server",
+                "   - Test model evaluation",
+                "",
+                "4. Frontend Testing",
+                "   - Install npm dependencies",
+                "   - Test build process",
+                "   - Test development server",
+                "   - Test frontend-backend integration",
+                "",
+                "5. Integration Testing",
+                "   - End-to-end workflow validation",
+                "   - Performance benchmarking",
+                "   - Generate comprehensive report"
+            ]
+        else:
+            steps = [
+                "1. System Requirements Check",
+                "   - Python version validation",
+                "   - Package dependencies verification",
+                "   - Directory structure validation",
+                "   - Node.js/npm availability",
+                "",
+                "2. Data Preparation",
+                f"   - Load {self.config_name} configuration",
+                "   - Download and prepare training dataset",
+                "   - Validate data quality",
+                "",
+                "3. Model Training",
+                "   - Backup existing checkpoints",
+                "   - Train model for 3 epochs (test mode)",
+                "   - Monitor training progress",
+                "   - Validate training outputs",
+                "",
+                "4. Backend Testing",
+                "   - Test model loading",
+                "   - Test chat interface",
+                "   - Test API server",
+                "   - Test model evaluation",
+                "",
+                "5. Frontend Testing",
+                "   - Install npm dependencies",
+                "   - Test build process",
+                "   - Test development server",
+                "   - Test frontend-backend integration",
+                "",
+                "6. Integration Testing",
+                "   - End-to-end workflow validation",
+                "   - Performance benchmarking",
+                "   - Generate comprehensive report"
+            ]
 
         self.logger.info("Pipeline Preview:")
         for step in steps:
@@ -968,19 +1039,44 @@ class AutoTest:
 def main():
     """Main entry point"""
     parser = argparse.ArgumentParser(description="MiniGPT AutoTest - Complete Automation System")
-    parser.add_argument("--config", default="small", choices=["small", "medium"],
+    parser.add_argument("--config", default="small", choices=["small", "medium", "production"],
                        help="Model configuration to use")
-    parser.add_argument("--step", choices=["system", "data", "train", "backend", "frontend", "integration"],
+    parser.add_argument("--step", choices=["system", "data", "train", "backend", "frontend", "integration", "pretrained"],
                        help="Run specific step only")
     parser.add_argument("--dry-run", action="store_true",
                        help="Preview what would be executed without running")
     parser.add_argument("--epochs", type=int, default=3,
                        help="Number of training epochs (for quick testing)")
+    parser.add_argument("--use-pretrained", type=str,
+                       help="Use a pre-trained model instead of training (e.g., gpt2, distilgpt2)")
+    parser.add_argument("--list-pretrained", action="store_true",
+                       help="List available pre-trained models and exit")
 
     args = parser.parse_args()
 
+    # Handle list pretrained models
+    if args.list_pretrained:
+        try:
+            sys.path.insert(0, 'backend/src')
+            from minigpt.pretrained import list_available_models
+
+            models = list_available_models()
+            print("🤖 Available Pre-trained Models:")
+            print("=" * 50)
+            for key, info in models.items():
+                print(f"📦 {key}")
+                print(f"   Size: {info['size']}")
+                print(f"   Description: {info['description']}")
+                print(f"   License: {info['license']}")
+                print()
+            print("Usage: python autoTest.py --use-pretrained gpt2")
+            return
+        except ImportError:
+            print("❌ Could not import pre-trained model system")
+            return
+
     try:
-        autotest = AutoTest(config_name=args.config, dry_run=args.dry_run)
+        autotest = AutoTest(config_name=args.config, dry_run=args.dry_run, use_pretrained=args.use_pretrained)
 
         if args.step:
             success = autotest.run_specific_step(args.step)

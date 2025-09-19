@@ -6,6 +6,7 @@ from .model import MiniGPT
 from .tokenizer import get_tokenizer
 from .config import load_config
 from .utils import get_device, load_checkpoint, find_best_checkpoint
+from .remote import RemoteChatBot, list_remote_models
 
 
 class ChatBot:
@@ -179,7 +180,11 @@ class ChatBot:
 def main():
     parser = argparse.ArgumentParser(description="Chat with MiniGPT model")
     parser.add_argument("--model", type=str, default=None,
-                       help="Path to model checkpoint (auto-finds latest if not specified)")
+                       help="Path to local model checkpoint (auto-finds latest if not specified)")
+    parser.add_argument("--remote", type=str, default=None,
+                       help="Use remote model (e.g., hf:gpt2, openai:gpt-3.5-turbo, claude:claude-3-sonnet)")
+    parser.add_argument("--list-remote", action="store_true",
+                       help="List available remote models")
     parser.add_argument("--config", type=str, default=None,
                        help="Path to config file (optional)")
     parser.add_argument("--prompt", type=str, default=None,
@@ -193,21 +198,79 @@ def main():
 
     args = parser.parse_args()
 
-    # Find model if not specified
-    model_path = args.model
-    if not model_path:
-        best_checkpoint = find_best_checkpoint()
-        if not best_checkpoint:
-            print("❌ No trained models found!")
-            print("Please train a model first:")
-            print("  python -m minigpt.train --config configs/small.yaml")
-            print("  or run: python autoTest.py")
-            return
-        model_path = str(best_checkpoint)
-        print(f"📁 Using model: {model_path}")
+    # Handle list remote models
+    if args.list_remote:
+        print("🌐 Available Remote Models:")
+        print("=" * 50)
 
-    # Initialize chatbot
-    chatbot = ChatBot(model_path, args.config)
+        remote_models = list_remote_models()
+        by_provider = {}
+        for key, info in remote_models.items():
+            provider = info['provider']
+            if provider not in by_provider:
+                by_provider[provider] = []
+            by_provider[provider].append((key, info))
+
+        for provider, models in by_provider.items():
+            print(f"\n📡 {provider.upper()}:")
+            for key, info in models:
+                cost_color = "🟢" if "Free" in info['cost'] else "🟡"
+                print(f"  {cost_color} {key} - {info['description']} ({info['cost']})")
+
+        print(f"\nUsage:")
+        print(f"  python -m minigpt.chat --remote hf:gpt2")
+        print(f"  python -m minigpt.chat --remote openai:gpt-3.5-turbo")
+        return
+
+    # Choose between remote and local models
+    if args.remote:
+        # Use remote model
+        try:
+            print(f"🌐 Initializing remote model: {args.remote}")
+            chatbot = RemoteChatBot(args.remote)
+
+            if args.prompt:
+                # Single prompt mode for remote
+                response = chatbot.generate_text(args.prompt, args.max_length, args.temperature)
+                print(f"Prompt: {args.prompt}")
+                print(f"Response: {response}")
+            else:
+                # Interactive chat mode
+                chatbot.chat_loop()
+            return
+
+        except Exception as e:
+            print(f"❌ Failed to initialize remote model: {e}")
+            print("💡 Try: python -m minigpt.chat --list-remote")
+            return
+
+    else:
+        # Use local model
+        model_path = args.model
+        if not model_path:
+            best_checkpoint = find_best_checkpoint()
+            if not best_checkpoint:
+                print("❌ No local trained models found!")
+                print()
+                print("🎯 You have two options:")
+                print("1. Train a local model:")
+                print("   python -m minigpt.train --config configs/small.yaml")
+                print("   python autoTest.py")
+                print()
+                print("2. Use a remote model (no training needed):")
+                print("   python -m minigpt.chat --remote hf:gpt2")
+                print("   python -m minigpt.chat --list-remote")
+                return
+            model_path = str(best_checkpoint)
+            print(f"📁 Using local model: {model_path}")
+
+        # Initialize local chatbot
+        try:
+            chatbot = ChatBot(model_path, args.config)
+        except Exception as e:
+            print(f"❌ Failed to load local model: {e}")
+            print("💡 Try using a remote model: python -m minigpt.chat --remote hf:gpt2")
+            return
 
     if args.prompt:
         # Single prompt mode

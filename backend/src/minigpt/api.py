@@ -23,6 +23,8 @@ from .tokenizer import get_tokenizer
 from .chat import ChatBot
 from .utils import get_device, load_checkpoint, get_checkpoints_dir, find_best_checkpoint
 from .evaluate import ModelEvaluator
+from .pretrained import PretrainedModelImporter, list_available_models
+from .remote import RemoteModelManager, list_remote_models
 
 
 # Configure logging
@@ -47,6 +49,7 @@ class GenerationResponse(BaseModel):
 
 class ChatMessage(BaseModel):
     message: str
+    model: str = Field("local", description="Model to use: 'local' or remote model key like 'hf:gpt2'")
     max_length: int = Field(50, ge=1, le=200)
     temperature: float = Field(0.8, ge=0.1, le=2.0)
     top_k: int = Field(50, ge=1, le=100)
@@ -87,8 +90,10 @@ class TrainingProgressResponse(BaseModel):
     progress_percentage: float
 
 
-# Global model instance
+# Global instances
 model_manager = None
+pretrained_importer = None
+remote_manager = None
 
 
 class ModelManager:
@@ -191,11 +196,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Initialize model manager
+# Initialize model manager and pre-trained importer
 @app.on_event("startup")
 async def startup_event():
-    global model_manager
+    global model_manager, pretrained_importer, remote_manager
     model_manager = ModelManager()
+    pretrained_importer = PretrainedModelImporter()
+    remote_manager = RemoteModelManager()
 
     # Try to load the best model automatically
     try:
@@ -265,20 +272,39 @@ async def get_model_info():
 
 @app.get("/model/list")
 async def list_models():
-    """List available model checkpoints"""
+    """List available model checkpoints and remote models"""
+    # Local models
     checkpoints_dir = get_checkpoints_dir()
-
-    models = []
+    local_models = []
     for checkpoint in checkpoints_dir.glob("*.pt"):
-        models.append({
+        local_models.append({
+            "key": "local",
             "name": checkpoint.name,
             "path": str(checkpoint),
             "size_mb": checkpoint.stat().st_size / (1024 * 1024),
             "modified": checkpoint.stat().st_mtime,
-            "is_best": checkpoint.name == "best_model.pt"
+            "is_best": checkpoint.name == "best_model.pt",
+            "type": "local"
         })
 
-    return {"models": sorted(models, key=lambda x: x["modified"], reverse=True)}
+    # Remote models
+    remote_models = []
+    if remote_manager:
+        remote_model_info = list_remote_models()
+        for key, info in remote_model_info.items():
+            remote_models.append({
+                "key": key,
+                "name": info.get("name", key),
+                "description": info.get("description", ""),
+                "provider": info.get("provider", "unknown"),
+                "cost": info.get("cost", "unknown"),
+                "type": "remote"
+            })
+
+    return {
+        "local_models": sorted(local_models, key=lambda x: x["modified"], reverse=True),
+        "remote_models": remote_models
+    }
 
 
 # Text generation endpoints
@@ -301,25 +327,40 @@ async def generate_text(request: GenerationRequest):
 @app.post("/chat", response_model=ChatResponse)
 async def chat(message: ChatMessage):
     """Single-turn chat with the model"""
-    logger.info(f"🔵 Chat request received: '{message.message}' (temp={message.temperature}, max_len={message.max_length})")
-
-    if not model_manager or not model_manager.is_ready():
-        logger.error("❌ No model loaded or model not ready")
-        raise HTTPException(status_code=503, detail="No model loaded. Please train a model first.")
+    logger.info(f"🔵 Chat request received: '{message.message}' (model={message.model}, temp={message.temperature}, max_len={message.max_length})")
 
     try:
         import time
         start_time = time.time()
 
-        logger.info(f"🤖 Generating response...")
-        result = model_manager.generate_text(
-            message.message,
-            message.max_length,
-            message.temperature,
-            message.top_k
-        )
+        # Check if using remote model
+        if message.model != "local":
+            logger.info(f"🌐 Using remote model: {message.model}")
+            if not remote_manager:
+                raise HTTPException(status_code=503, detail="Remote model system not initialized")
 
-        response_text = result["generated_text"]
+            response_text = remote_manager.generate_text(
+                message.model,
+                message.message,
+                max_tokens=message.max_length,
+                temperature=message.temperature
+            )
+        else:
+            # Use local model
+            logger.info("🤖 Using local model")
+            if not model_manager or not model_manager.is_ready():
+                logger.error("❌ No local model loaded or model not ready")
+                raise HTTPException(status_code=503, detail="No local model loaded. Please train a model first or use a remote model.")
+
+            logger.info(f"🤖 Generating response...")
+            result = model_manager.generate_text(
+                message.message,
+                message.max_length,
+                message.temperature,
+                message.top_k
+            )
+            response_text = result["generated_text"]
+
         generation_time = time.time() - start_time
 
         logger.info(f"✅ Response generated in {generation_time:.2f}s: '{response_text[:50]}{'...' if len(response_text) > 50 else ''}'")
@@ -390,6 +431,119 @@ async def get_training_progress():
         raise HTTPException(status_code=500, detail=f"Failed to read training progress: {str(e)}")
 
 
+# Pre-trained model endpoints
+@app.get("/pretrained/available")
+async def list_available_pretrained_models():
+    """List all available pre-trained models for import"""
+    return {"models": list_available_models()}
+
+
+@app.get("/pretrained/imported")
+async def list_imported_pretrained_models():
+    """List all imported pre-trained models"""
+    if not pretrained_importer:
+        raise HTTPException(status_code=503, detail="Pre-trained model system not initialized")
+
+    return {"models": pretrained_importer.list_imported_models()}
+
+
+@app.post("/pretrained/import/{model_key}")
+async def import_pretrained_model_endpoint(model_key: str, background_tasks: BackgroundTasks):
+    """Import a pre-trained model"""
+    if not pretrained_importer:
+        raise HTTPException(status_code=503, detail="Pre-trained model system not initialized")
+
+    if model_key not in list_available_models():
+        available = list(list_available_models().keys())
+        raise HTTPException(status_code=404, detail=f"Model {model_key} not available. Available: {available}")
+
+    def import_model():
+        try:
+            path = pretrained_importer.import_model(model_key)
+            logger.info(f"Successfully imported {model_key} to {path}")
+        except Exception as e:
+            logger.error(f"Failed to import {model_key}: {e}")
+
+    background_tasks.add_task(import_model)
+    return {"message": f"Started importing {model_key}", "model_key": model_key}
+
+
+@app.delete("/pretrained/remove/{model_key}")
+async def remove_pretrained_model(model_key: str):
+    """Remove an imported pre-trained model"""
+    if not pretrained_importer:
+        raise HTTPException(status_code=503, detail="Pre-trained model system not initialized")
+
+    success = pretrained_importer.remove_model(model_key)
+    if success:
+        return {"message": f"Model {model_key} removed successfully"}
+    else:
+        raise HTTPException(status_code=404, detail=f"Model {model_key} not found")
+
+
+# Remote API settings endpoints
+@app.post("/remote/set-token")
+async def set_api_token(provider: str, token: str):
+    """Set API token for remote provider"""
+    import os
+
+    token_env_vars = {
+        "huggingface": "HUGGINGFACE_API_TOKEN",
+        "openai": "OPENAI_API_KEY",
+        "anthropic": "ANTHROPIC_API_KEY"
+    }
+
+    if provider not in token_env_vars:
+        raise HTTPException(status_code=400, detail=f"Unknown provider: {provider}")
+
+    env_var = token_env_vars[provider]
+    os.environ[env_var] = token
+
+    # Clear cached clients to pick up new token
+    if remote_manager:
+        remote_manager.clients.clear()
+
+    return {"message": f"Token set for {provider}", "provider": provider}
+
+
+@app.get("/remote/auth-status")
+async def get_auth_status():
+    """Check authentication status for remote providers"""
+    import os
+
+    status = {
+        "huggingface": {
+            "authenticated": bool(os.getenv("HUGGINGFACE_API_TOKEN")),
+            "required": False,
+            "description": "Optional - improves rate limits and access to some models"
+        },
+        "openai": {
+            "authenticated": bool(os.getenv("OPENAI_API_KEY")),
+            "required": True,
+            "description": "Required for OpenAI models (GPT-3.5, GPT-4)"
+        },
+        "anthropic": {
+            "authenticated": bool(os.getenv("ANTHROPIC_API_KEY")),
+            "required": True,
+            "description": "Required for Claude models"
+        }
+    }
+
+    return status
+
+
+@app.get("/pretrained/info/{model_key}")
+async def get_pretrained_model_info(model_key: str):
+    """Get information about a pre-trained model"""
+    if not pretrained_importer:
+        raise HTTPException(status_code=503, detail="Pre-trained model system not initialized")
+
+    try:
+        return pretrained_importer.get_model_info(model_key)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+
 @app.get("/")
 async def root():
     """Root endpoint with API information"""
@@ -402,7 +556,12 @@ async def root():
             "generate": "/generate",
             "chat": "/chat",
             "model_info": "/model/info",
+            "model_list": "/model/list",
             "training_progress": "/training/progress",
+            "pretrained_available": "/pretrained/available",
+            "pretrained_imported": "/pretrained/imported",
+            "remote_auth_status": "/remote/auth-status",
+            "remote_set_token": "/remote/set-token",
             "docs": "/docs"
         }
     }

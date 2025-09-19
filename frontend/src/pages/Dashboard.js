@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Card,
@@ -20,6 +21,35 @@ import {
 } from '@mui/icons-material';
 
 function Dashboard() {
+  const navigate = useNavigate();
+
+  const handleQuickAction = (action) => {
+    switch (action) {
+      case 'training':
+        navigate('/training');
+        break;
+      case 'chat':
+        navigate('/chat');
+        break;
+      case 'data':
+        navigate('/data');
+        break;
+      case 'models':
+        navigate('/models');
+        break;
+      default:
+        console.log('Unknown action:', action);
+    }
+  };
+
+  const handleResumeTraining = () => {
+    navigate('/training');
+  };
+
+  const handleViewDetails = () => {
+    navigate('/training');
+  };
+
   const stats = [
     { title: 'Active Models', value: '3', icon: <ModelIcon />, color: 'primary' },
     { title: 'Training Jobs', value: '1', icon: <TrainingIcon />, color: 'secondary' },
@@ -94,10 +124,19 @@ function Dashboard() {
                 <LinearProgress variant="determinate" value={68} sx={{ height: 8, borderRadius: 4 }} />
               </Box>
               <Box display="flex" gap={2} mt={2}>
-                <Button variant="contained" startIcon={<PlayIcon />} size="small">
+                <Button
+                  variant="contained"
+                  startIcon={<PlayIcon />}
+                  size="small"
+                  onClick={handleResumeTraining}
+                >
                   Resume
                 </Button>
-                <Button variant="outlined" size="small">
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={handleViewDetails}
+                >
                   View Details
                 </Button>
               </Box>
@@ -116,6 +155,7 @@ function Dashboard() {
                     fullWidth
                     startIcon={<TrainingIcon />}
                     sx={{ py: 2 }}
+                    onClick={() => handleQuickAction('training')}
                   >
                     Start Training
                   </Button>
@@ -126,6 +166,7 @@ function Dashboard() {
                     fullWidth
                     startIcon={<ChatIcon />}
                     sx={{ py: 2 }}
+                    onClick={() => handleQuickAction('chat')}
                   >
                     New Chat
                   </Button>
@@ -136,6 +177,7 @@ function Dashboard() {
                     fullWidth
                     startIcon={<DataIcon />}
                     sx={{ py: 2 }}
+                    onClick={() => handleQuickAction('data')}
                   >
                     Upload Data
                   </Button>
@@ -146,6 +188,7 @@ function Dashboard() {
                     fullWidth
                     startIcon={<ModelIcon />}
                     sx={{ py: 2 }}
+                    onClick={() => handleQuickAction('models')}
                   >
                     Manage Models
                   </Button>

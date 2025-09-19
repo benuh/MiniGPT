@@ -15,6 +15,12 @@ import {
   MenuItem,
   Slider,
   Divider,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Alert,
+  Link,
 } from '@mui/material';
 import {
   Send as SendIcon,
@@ -23,6 +29,7 @@ import {
   Settings as SettingsIcon,
   Clear as ClearIcon,
   Download as ExportIcon,
+  Key as KeyIcon,
 } from '@mui/icons-material';
 import MLTermDialog from '../components/MLTermDialog';
 import MLTermTooltip from '../components/MLTermTooltip';
@@ -37,14 +44,21 @@ function Chat() {
     }
   ]);
   const [inputMessage, setInputMessage] = useState('');
-  const [selectedModel, setSelectedModel] = useState('MiniGPT-v2');
+  const [selectedModel, setSelectedModel] = useState('local');
   const [temperature, setTemperature] = useState(0.7);
   const [maxTokens, setMaxTokens] = useState(150);
   const [isGenerating, setIsGenerating] = useState(false);
   const [helpDialog, setHelpDialog] = useState({ open: false, termKey: null });
+  const [availableModels, setAvailableModels] = useState([]);
+  const [isLoadingModels, setIsLoadingModels] = useState(true);
+  const [authDialog, setAuthDialog] = useState({ open: false, provider: null });
+  const [authStatus, setAuthStatus] = useState({});
+  const [apiTokens, setApiTokens] = useState({
+    huggingface: '',
+    openai: '',
+    anthropic: ''
+  });
   const messagesEndRef = useRef(null);
-
-  const models = ['MiniGPT-v2', 'MiniGPT-v1', 'MiniGPT-base'];
 
   const handleLearnMore = (termKey) => {
     setHelpDialog({ open: true, termKey });
@@ -66,6 +80,188 @@ function Chat() {
     scrollToBottom();
   }, [messages]);
 
+  // Fetch available models on component mount
+  useEffect(() => {
+    const fetchModels = async () => {
+      try {
+        setIsLoadingModels(true);
+        const response = await fetch('http://localhost:8000/model/list');
+        if (response.ok) {
+          const data = await response.json();
+
+          // Combine local and remote models for the dropdown
+          const allModels = [];
+
+          // Add local models
+          if (data.local_models && data.local_models.length > 0) {
+            allModels.push({
+              key: 'local',
+              name: 'Local Model',
+              type: 'local',
+              description: `${data.local_models.length} local model(s) available`
+            });
+          }
+
+          // Add remote models
+          if (data.remote_models && data.remote_models.length > 0) {
+            data.remote_models.forEach(model => {
+              allModels.push({
+                key: model.key,
+                name: model.name || model.key,
+                type: 'remote',
+                description: model.description || '',
+                provider: model.provider || '',
+                cost: model.cost || ''
+              });
+            });
+          }
+
+          setAvailableModels(allModels);
+
+          // Set default model
+          if (allModels.length > 0) {
+            // Prefer remote models if no local models available
+            const hasLocal = allModels.some(m => m.type === 'local');
+            if (!hasLocal && allModels.length > 0) {
+              // Default to first free remote model
+              const freeRemote = allModels.find(m => m.cost && m.cost.includes('Free'));
+              if (freeRemote) {
+                setSelectedModel(freeRemote.key);
+              } else if (allModels[0]) {
+                setSelectedModel(allModels[0].key);
+              }
+            }
+          }
+        } else {
+          console.error('Failed to fetch models:', response.statusText);
+        }
+      } catch (error) {
+        console.error('Error fetching models:', error);
+        // Fallback to default remote model
+        setAvailableModels([
+          {
+            key: 'hf:gpt2',
+            name: 'GPT-2 (HuggingFace)',
+            type: 'remote',
+            description: 'Free GPT-2 model from HuggingFace',
+            provider: 'HuggingFace',
+            cost: 'Free'
+          }
+        ]);
+        setSelectedModel('hf:gpt2');
+      } finally {
+        setIsLoadingModels(false);
+      }
+    };
+
+    fetchModels();
+  }, []);
+
+  // Fetch authentication status
+  useEffect(() => {
+    const fetchAuthStatus = async () => {
+      try {
+        const response = await fetch('http://localhost:8000/remote/auth-status');
+        if (response.ok) {
+          const status = await response.json();
+          setAuthStatus(status);
+        }
+      } catch (error) {
+        console.error('Error fetching auth status:', error);
+      }
+    };
+
+    fetchAuthStatus();
+  }, []);
+
+  const handleSetApiToken = async (provider, token) => {
+    try {
+      const response = await fetch('http://localhost:8000/remote/set-token', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ provider, token }),
+      });
+
+      if (response.ok) {
+        // Update auth status
+        const statusResponse = await fetch('http://localhost:8000/remote/auth-status');
+        if (statusResponse.ok) {
+          const status = await statusResponse.json();
+          setAuthStatus(status);
+        }
+
+        // Clear model cache to refetch with new auth
+        setAvailableModels([]);
+        setIsLoadingModels(true);
+
+        // Refetch models
+        const modelsResponse = await fetch('http://localhost:8000/model/list');
+        if (modelsResponse.ok) {
+          const data = await modelsResponse.json();
+          // [Same model processing logic as in the other useEffect]
+          const allModels = [];
+          if (data.local_models && data.local_models.length > 0) {
+            allModels.push({
+              key: 'local',
+              name: 'Local Model',
+              type: 'local',
+              description: `${data.local_models.length} local model(s) available`
+            });
+          }
+          if (data.remote_models && data.remote_models.length > 0) {
+            data.remote_models.forEach(model => {
+              allModels.push({
+                key: model.key,
+                name: model.name || model.key,
+                type: 'remote',
+                description: model.description || '',
+                provider: model.provider || '',
+                cost: model.cost || ''
+              });
+            });
+          }
+          setAvailableModels(allModels);
+        }
+        setIsLoadingModels(false);
+
+        setAuthDialog({ open: false, provider: null });
+        setApiTokens(prev => ({ ...prev, [provider]: '' }));
+
+        return true;
+      } else {
+        throw new Error('Failed to set token');
+      }
+    } catch (error) {
+      console.error('Error setting API token:', error);
+      return false;
+    }
+  };
+
+  const handleOpenAuthDialog = (provider) => {
+    setAuthDialog({ open: true, provider });
+  };
+
+  const handleCloseAuthDialog = () => {
+    setAuthDialog({ open: false, provider: null });
+    setApiTokens(prev => ({ ...prev, [authDialog.provider]: '' }));
+  };
+
+  const handleSaveToken = async () => {
+    const { provider } = authDialog;
+    const token = apiTokens[provider];
+
+    if (token.trim()) {
+      const success = await handleSetApiToken(provider, token.trim());
+      if (success) {
+        // Success handled in handleSetApiToken
+      } else {
+        alert('Failed to set API token. Please try again.');
+      }
+    }
+  };
+
   const handleSendMessage = async () => {
     if (!inputMessage.trim() || isGenerating) return;
 
@@ -84,6 +280,7 @@ function Chat() {
     try {
       console.log('🔵 Sending chat request:', {
         message: messageToSend,
+        model: selectedModel,
         max_length: maxTokens,
         temperature: temperature,
         top_k: 50,
@@ -97,6 +294,7 @@ function Chat() {
         },
         body: JSON.stringify({
           message: messageToSend,
+          model: selectedModel,
           max_length: maxTokens,
           temperature: temperature,
           top_k: 50,
@@ -134,7 +332,12 @@ function Chat() {
       if (error.name === 'TypeError' && error.message.includes('fetch')) {
         errorMessage = `🔌 Connection Error: Cannot reach backend at http://localhost:8000\n\nDebugging steps:\n1. Is the backend running? Check the backend terminal\n2. Is it on port 8000? Look for "Uvicorn running on http://0.0.0.0:8000"\n3. Try opening http://localhost:8000 in your browser`;
       } else if (error.message.includes('503')) {
-        errorMessage = `🤖 Model Not Ready: ${error.message}\n\nDebugging steps:\n1. Train a model first: cd backend && python -m minigpt.train\n2. Or check if model loading failed in backend logs`;
+        const modelType = selectedModel === 'local' ? 'local' : 'remote';
+        if (modelType === 'local') {
+          errorMessage = `🤖 Local Model Not Ready: ${error.message}\n\nOptions:\n1. Train a local model: cd backend && python -m minigpt.train\n2. Use a remote model instead (select from dropdown above)`;
+        } else {
+          errorMessage = `🌐 Remote Model Error: ${error.message}\n\nTrying alternative:\n1. Check your internet connection\n2. Try a different remote model\n3. For premium models (OpenAI, Claude), ensure API keys are set`;
+        }
       } else if (error.message.includes('500')) {
         errorMessage = `💥 Server Error: ${error.message}\n\nCheck the backend terminal for detailed error logs and stack trace.`;
       } else {
@@ -193,6 +396,9 @@ function Chat() {
           Chat with MiniGPT
         </Typography>
         <Box display="flex" gap={1}>
+          <IconButton onClick={() => handleOpenAuthDialog('huggingface')} color="primary" title="API Keys">
+            <KeyIcon />
+          </IconButton>
           <IconButton onClick={exportChat} color="primary">
             <ExportIcon />
           </IconButton>
@@ -335,14 +541,40 @@ function Chat() {
                     value={selectedModel}
                     label="Model"
                     onChange={(e) => setSelectedModel(e.target.value)}
+                    disabled={isLoadingModels}
                   >
-                    {models.map((model) => (
-                      <MenuItem key={model} value={model}>
-                        {model}
-                      </MenuItem>
-                    ))}
+                    {isLoadingModels ? (
+                      <MenuItem value="">Loading models...</MenuItem>
+                    ) : availableModels.length === 0 ? (
+                      <MenuItem value="">No models available</MenuItem>
+                    ) : (
+                      availableModels.map((model) => (
+                        <MenuItem key={model.key} value={model.key}>
+                          <Box>
+                            <Typography variant="body2">
+                              {model.name}
+                            </Typography>
+                            {model.type === 'remote' && (
+                              <Typography variant="caption" color="textSecondary">
+                                {model.provider} • {model.cost}
+                              </Typography>
+                            )}
+                            {model.description && (
+                              <Typography variant="caption" color="textSecondary" display="block">
+                                {model.description}
+                              </Typography>
+                            )}
+                          </Box>
+                        </MenuItem>
+                      ))
+                    )}
                   </Select>
                 </FormControl>
+                {selectedModel && selectedModel !== 'local' && (
+                  <Typography variant="caption" color="primary" mt={1} display="block">
+                    🌐 Using remote model: {availableModels.find(m => m.key === selectedModel)?.name || selectedModel}
+                  </Typography>
+                )}
               </Box>
 
               <Box mb={3}>
@@ -411,7 +643,12 @@ function Chat() {
                   <Typography variant="caption" color="textSecondary">
                     Model:
                   </Typography>
-                  <Chip label={selectedModel} size="small" color="primary" />
+                  <Chip
+                    label={availableModels.find(m => m.key === selectedModel)?.name || selectedModel}
+                    size="small"
+                    color={selectedModel === 'local' ? 'default' : 'primary'}
+                    icon={selectedModel === 'local' ? undefined : <span>🌐</span>}
+                  />
                 </Box>
                 <Box display="flex" justifyContent="space-between">
                   <Typography variant="caption" color="textSecondary">
@@ -436,6 +673,88 @@ function Chat() {
         onClose={handleCloseHelp}
         onTermClick={handleTermClick}
       />
+
+      {/* API Authentication Dialog */}
+      <Dialog open={authDialog.open} onClose={handleCloseAuthDialog} maxWidth="sm" fullWidth>
+        <DialogTitle>
+          API Keys & Authentication
+        </DialogTitle>
+        <DialogContent>
+          <Box mb={2}>
+            <Alert severity="info">
+              Set API keys to access premium models and improve rate limits for free models.
+            </Alert>
+          </Box>
+
+          {Object.entries(authStatus).map(([provider, status]) => (
+            <Box key={provider} mb={3}>
+              <Box display="flex" alignItems="center" gap={1} mb={1}>
+                <Typography variant="h6" sx={{ textTransform: 'capitalize' }}>
+                  {provider}
+                </Typography>
+                <Chip
+                  label={status.authenticated ? 'Connected' : 'Not Connected'}
+                  color={status.authenticated ? 'success' : 'default'}
+                  size="small"
+                />
+              </Box>
+
+              <Typography variant="body2" color="textSecondary" mb={2}>
+                {status.description}
+              </Typography>
+
+              {!status.authenticated && (
+                <Box>
+                  <TextField
+                    fullWidth
+                    type="password"
+                    placeholder={`Enter ${provider} API key`}
+                    value={apiTokens[provider] || ''}
+                    onChange={(e) => setApiTokens(prev => ({ ...prev, [provider]: e.target.value }))}
+                    size="small"
+                    sx={{ mb: 1 }}
+                  />
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    onClick={() => {
+                      setAuthDialog({ open: true, provider });
+                    }}
+                  >
+                    Set {provider} API Key
+                  </Button>
+                </Box>
+              )}
+
+              {provider === 'huggingface' && (
+                <Typography variant="caption" color="textSecondary" display="block" mt={1}>
+                  Get free token at: <Link href="https://huggingface.co/settings/tokens" target="_blank">huggingface.co/settings/tokens</Link>
+                </Typography>
+              )}
+              {provider === 'openai' && (
+                <Typography variant="caption" color="textSecondary" display="block" mt={1}>
+                  Get API key at: <Link href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com/api-keys</Link>
+                </Typography>
+              )}
+              {provider === 'anthropic' && (
+                <Typography variant="caption" color="textSecondary" display="block" mt={1}>
+                  Get API key at: <Link href="https://console.anthropic.com/" target="_blank">console.anthropic.com</Link>
+                </Typography>
+              )}
+            </Box>
+          ))}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseAuthDialog}>Close</Button>
+          <Button
+            onClick={handleSaveToken}
+            variant="contained"
+            disabled={!apiTokens[authDialog.provider]?.trim()}
+          >
+            Save API Key
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

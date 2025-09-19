@@ -11,18 +11,34 @@ Welcome to MiniGPT! This guide will help you get started with training your own 
 - Each person gets a unique, personalized chatbot
 - Models stay local to your machine
 
-## ⚡ Quick Start (One Command)
+## ⚡ Quick Start Options
 
+### 🚀 **Option 1: Instant AI (No Training)**
+```bash
+cd backend
+pip install -e .
+python -m minigpt.chat --remote hf:gpt2
+```
+**Start chatting immediately with free models from HuggingFace, OpenAI, or Claude!**
+
+### 🎯 **Option 2: Complete Automation**
 ```bash
 python autoTest.py
 ```
-
-This single command will:
+This command will:
 1. ✅ Check your system requirements
 2. 📥 Download training data
 3. 🎯 Train your personal model (15-20 minutes)
 4. 🧪 Test everything works
 5. 🚀 Start your chatbot
+
+### 🎮 **Option 3: Manual Training**
+```bash
+cd backend
+pip install -e .
+python -m minigpt.train --config configs/small.yaml
+python -m minigpt.chat
+```
 
 ## 📋 Prerequisites
 
@@ -64,20 +80,31 @@ python -m minigpt.chat --model checkpoints/best_model.pt
 
 ## 🎮 Usage After Setup
 
-### Start Everything
+### 🌐 **Remote Models (Instant)**
 ```bash
+# List all available remote models
+python -m minigpt.chat --list-remote
+
+# Chat with free models
+python -m minigpt.chat --remote hf:gpt2
+python -m minigpt.chat --remote hf:gpt-neo-1.3b
+
+# Chat with premium models (API key required)
+export OPENAI_API_KEY="your-key"
+python -m minigpt.chat --remote openai:gpt-3.5-turbo
+```
+
+### 🎯 **Local Models**
+```bash
+# Start everything (web interface)
 ./start-all.sh
 # Visit http://localhost:3000
-```
 
-### Command Line Chat
-```bash
+# Command line chat
 cd backend
 python -m minigpt.chat
-```
 
-### API Server
-```bash
+# API server
 cd backend
 python -m minigpt.api
 # Visit http://localhost:8000/docs

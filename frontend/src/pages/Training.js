@@ -1,5 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { PlayIcon, StopIcon, CogIcon, ChartBarIcon } from '../components/Icons';
+import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Button,
+  Typography,
+  Box,
+  Grid,
+  Chip,
+  Divider,
+} from '@mui/material';
 
 const Training = () => {
   const [isTraining, setIsTraining] = useState(false);
@@ -11,6 +23,8 @@ const Training = () => {
     learningRate: 0.0003,
     dataset: 'wikitext'
   });
+  const [viewDetailsDialog, setViewDetailsDialog] = useState(false);
+  const [resumeDialog, setResumeDialog] = useState(false);
 
   // Poll for training progress
   useEffect(() => {
@@ -69,6 +83,35 @@ const Training = () => {
     if (hours > 0) return `${hours}h ${minutes}m ${secs}s`;
     if (minutes > 0) return `${minutes}m ${secs}s`;
     return `${secs}s`;
+  };
+
+  const handleResumeTraining = async () => {
+    try {
+      setIsTraining(true);
+      setResumeDialog(false);
+      // Call resume training API
+      const response = await fetch('http://localhost:8000/training/resume', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(config),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to resume training');
+      }
+
+      console.log('Training resumed successfully');
+    } catch (error) {
+      console.error('Failed to resume training:', error);
+      setIsTraining(false);
+      alert('Failed to resume training. Please check console for details.');
+    }
+  };
+
+  const handleViewDetails = () => {
+    setViewDetailsDialog(true);
   };
 
   return (
@@ -170,6 +213,25 @@ const Training = () => {
                     {formatTime(trainingProgress.estimated_time_remaining)}
                   </div>
                 </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-3 pt-4 border-t border-gray-200">
+                <button
+                  onClick={() => setResumeDialog(true)}
+                  className="btn-primary flex items-center space-x-2"
+                  disabled={trainingProgress.status === 'running'}
+                >
+                  <PlayIcon className="w-4 h-4" />
+                  <span>Resume Training</span>
+                </button>
+                <button
+                  onClick={handleViewDetails}
+                  className="btn-secondary flex items-center space-x-2"
+                >
+                  <ChartBarIcon className="w-4 h-4" />
+                  <span>View Details</span>
+                </button>
               </div>
             </div>
           </div>
@@ -305,6 +367,89 @@ const Training = () => {
           </div>
         </div>
       </div>
+
+      {/* Resume Training Dialog */}
+      <Dialog open={resumeDialog} onClose={() => setResumeDialog(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Resume Training</DialogTitle>
+        <DialogContent>
+          <Typography mb={2}>
+            Do you want to resume training from the last checkpoint?
+          </Typography>
+          <Box bgcolor="grey.100" p={2} borderRadius={1}>
+            <Typography variant="body2" fontWeight="bold" mb={1}>Current Configuration:</Typography>
+            <Typography variant="body2">Model Size: {config.modelSize}</Typography>
+            <Typography variant="body2">Epochs: {config.epochs}</Typography>
+            <Typography variant="body2">Batch Size: {config.batchSize}</Typography>
+            <Typography variant="body2">Learning Rate: {config.learningRate}</Typography>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setResumeDialog(false)}>Cancel</Button>
+          <Button onClick={handleResumeTraining} variant="contained">Resume Training</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* View Details Dialog */}
+      <Dialog open={viewDetailsDialog} onClose={() => setViewDetailsDialog(false)} maxWidth="md" fullWidth>
+        <DialogTitle>Training Details</DialogTitle>
+        <DialogContent>
+          {trainingProgress ? (
+            <Box>
+              <Grid container spacing={3}>
+                <Grid item xs={12} md={6}>
+                  <Typography variant="h6" fontWeight="bold" mb={2}>Training Progress</Typography>
+                  <Box mb={2}>
+                    <Typography variant="body2" color="textSecondary">Status:</Typography>
+                    <Chip label={trainingProgress.status} color="primary" size="small" />
+                  </Box>
+                  <Box mb={2}>
+                    <Typography variant="body2" color="textSecondary">Current Epoch:</Typography>
+                    <Typography variant="body1">{trainingProgress.current_epoch} / {trainingProgress.total_epochs}</Typography>
+                  </Box>
+                  <Box mb={2}>
+                    <Typography variant="body2" color="textSecondary">Current Step:</Typography>
+                    <Typography variant="body1">{trainingProgress.current_step?.toLocaleString()} / {trainingProgress.total_steps?.toLocaleString()}</Typography>
+                  </Box>
+                  <Box mb={2}>
+                    <Typography variant="body2" color="textSecondary">Progress:</Typography>
+                    <Typography variant="body1">{trainingProgress.progress_percentage?.toFixed(1)}%</Typography>
+                  </Box>
+                </Grid>
+                <Grid item xs={12} md={6}>
+                  <Typography variant="h6" fontWeight="bold" mb={2}>Performance Metrics</Typography>
+                  <Box mb={2}>
+                    <Typography variant="body2" color="textSecondary">Training Loss:</Typography>
+                    <Typography variant="body1">{trainingProgress.train_loss?.toFixed(4) || 'N/A'}</Typography>
+                  </Box>
+                  <Box mb={2}>
+                    <Typography variant="body2" color="textSecondary">Validation Loss:</Typography>
+                    <Typography variant="body1">{trainingProgress.val_loss?.toFixed(4) || 'N/A'}</Typography>
+                  </Box>
+                  <Box mb={2}>
+                    <Typography variant="body2" color="textSecondary">Learning Rate:</Typography>
+                    <Typography variant="body1">{trainingProgress.learning_rate?.toExponential(2) || 'N/A'}</Typography>
+                  </Box>
+                  <Box mb={2}>
+                    <Typography variant="body2" color="textSecondary">Estimated Time Remaining:</Typography>
+                    <Typography variant="body1">{formatTime(trainingProgress.estimated_time_remaining)}</Typography>
+                  </Box>
+                </Grid>
+              </Grid>
+              <Divider sx={{ my: 2 }} />
+              <Typography variant="h6" fontWeight="bold" mb={2}>Model Information</Typography>
+              <Box mb={2}>
+                <Typography variant="body2" color="textSecondary">Model Name:</Typography>
+                <Typography variant="body1">{trainingProgress.model_name || 'MiniGPT'}</Typography>
+              </Box>
+            </Box>
+          ) : (
+            <Typography>No training data available.</Typography>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setViewDetailsDialog(false)} variant="contained">Close</Button>
+        </DialogActions>
+      </Dialog>
     </div>
   );
 };
