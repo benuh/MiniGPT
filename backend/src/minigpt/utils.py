@@ -2,7 +2,50 @@ import os
 import torch
 import random
 import numpy as np
-from typing import Dict, Any
+from pathlib import Path
+from typing import Dict, Any, Optional
+
+
+def get_checkpoints_dir() -> Path:
+    """Get the checkpoints directory, handling different working directories"""
+    # First try relative to current directory
+    checkpoints_dir = Path("checkpoints")
+    if checkpoints_dir.exists():
+        return checkpoints_dir
+
+    # Then try backend/checkpoints (if running from project root)
+    checkpoints_dir = Path("backend/checkpoints")
+    if checkpoints_dir.exists():
+        return checkpoints_dir
+
+    # Create checkpoints directory in current location if it doesn't exist
+    checkpoints_dir = Path("checkpoints")
+    checkpoints_dir.mkdir(exist_ok=True)
+    return checkpoints_dir
+
+
+def find_latest_checkpoint() -> Optional[Path]:
+    """Find the latest checkpoint file"""
+    checkpoints_dir = get_checkpoints_dir()
+    checkpoints = list(checkpoints_dir.glob("*.pt"))
+
+    if not checkpoints:
+        return None
+
+    return max(checkpoints, key=lambda x: x.stat().st_mtime)
+
+
+def find_best_checkpoint() -> Optional[Path]:
+    """Find the best model checkpoint (best_model.pt or latest)"""
+    checkpoints_dir = get_checkpoints_dir()
+
+    # First look for best_model.pt
+    best_model = checkpoints_dir / "best_model.pt"
+    if best_model.exists():
+        return best_model
+
+    # Otherwise return latest checkpoint
+    return find_latest_checkpoint()
 
 
 def get_device():
@@ -27,16 +70,24 @@ def set_seed(seed: int = 42):
 
 def save_checkpoint(checkpoint: Dict[str, Any], filename: str):
     """Save model checkpoint"""
-    os.makedirs("checkpoints", exist_ok=True)
-    filepath = os.path.join("checkpoints", filename)
+    checkpoints_dir = get_checkpoints_dir()
+    filepath = checkpoints_dir / filename
     torch.save(checkpoint, filepath)
     print(f"Checkpoint saved to {filepath}")
 
 
 def load_checkpoint(filename: str, device: torch.device) -> Dict[str, Any]:
     """Load model checkpoint"""
-    filepath = os.path.join("checkpoints", filename)
-    if not os.path.exists(filepath):
+    # Handle both just filename and full path
+    if os.path.sep in filename or filename.startswith('/'):
+        # Full path provided
+        filepath = Path(filename)
+    else:
+        # Just filename, find in checkpoints directory
+        checkpoints_dir = get_checkpoints_dir()
+        filepath = checkpoints_dir / filename
+
+    if not filepath.exists():
         raise FileNotFoundError(f"Checkpoint not found: {filepath}")
 
     checkpoint = torch.load(filepath, map_location=device)

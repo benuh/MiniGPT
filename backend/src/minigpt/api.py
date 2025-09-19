@@ -21,7 +21,7 @@ import torch
 from .model import MiniGPT
 from .tokenizer import get_tokenizer
 from .chat import ChatBot
-from .utils import get_device, load_checkpoint
+from .utils import get_device, load_checkpoint, get_checkpoints_dir, find_best_checkpoint
 from .evaluate import ModelEvaluator
 
 
@@ -197,17 +197,16 @@ async def startup_event():
     global model_manager
     model_manager = ModelManager()
 
-    # Try to load the latest model automatically
-    checkpoints_dir = Path("checkpoints")
-    if checkpoints_dir.exists():
-        checkpoints = list(checkpoints_dir.glob("*.pt"))
-        if checkpoints:
-            latest_checkpoint = max(checkpoints, key=lambda x: x.stat().st_mtime)
-            try:
-                model_manager.load_model(latest_checkpoint.name)
-                logger.info(f"Auto-loaded latest model: {latest_checkpoint.name}")
-            except Exception as e:
-                logger.warning(f"Failed to auto-load model: {str(e)}")
+    # Try to load the best model automatically
+    try:
+        best_checkpoint = find_best_checkpoint()
+        if best_checkpoint:
+            model_manager.load_model(str(best_checkpoint))
+            logger.info(f"Auto-loaded model: {best_checkpoint}")
+        else:
+            logger.info("No trained models found. Train a model first with 'python autoTest.py'")
+    except Exception as e:
+        logger.warning(f"Failed to auto-load model: {str(e)}")
 
 
 # Health check endpoint
@@ -237,11 +236,13 @@ async def load_model(model_name: str):
     if not model_manager:
         raise HTTPException(status_code=503, detail="Model manager not initialized")
 
-    model_path = f"checkpoints/{model_name}"
-    if not Path(model_path).exists():
+    checkpoints_dir = get_checkpoints_dir()
+    model_path = checkpoints_dir / model_name
+
+    if not model_path.exists():
         raise HTTPException(status_code=404, detail=f"Model {model_name} not found")
 
-    info = model_manager.load_model(model_name)
+    info = model_manager.load_model(str(model_path))
     return {"message": f"Model {model_name} loaded successfully", "info": info}
 
 
@@ -265,16 +266,16 @@ async def get_model_info():
 @app.get("/model/list")
 async def list_models():
     """List available model checkpoints"""
-    checkpoints_dir = Path("checkpoints")
-    if not checkpoints_dir.exists():
-        return {"models": []}
+    checkpoints_dir = get_checkpoints_dir()
 
     models = []
     for checkpoint in checkpoints_dir.glob("*.pt"):
         models.append({
             "name": checkpoint.name,
+            "path": str(checkpoint),
             "size_mb": checkpoint.stat().st_size / (1024 * 1024),
-            "modified": checkpoint.stat().st_mtime
+            "modified": checkpoint.stat().st_mtime,
+            "is_best": checkpoint.name == "best_model.pt"
         })
 
     return {"models": sorted(models, key=lambda x: x["modified"], reverse=True)}

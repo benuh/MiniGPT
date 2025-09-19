@@ -5,7 +5,7 @@ from typing import Optional
 from .model import MiniGPT
 from .tokenizer import get_tokenizer
 from .config import load_config
-from .utils import get_device, load_checkpoint
+from .utils import get_device, load_checkpoint, find_best_checkpoint
 
 
 class ChatBot:
@@ -178,8 +178,8 @@ class ChatBot:
 
 def main():
     parser = argparse.ArgumentParser(description="Chat with MiniGPT model")
-    parser.add_argument("--model", type=str, required=True,
-                       help="Path to model checkpoint")
+    parser.add_argument("--model", type=str, default=None,
+                       help="Path to model checkpoint (auto-finds latest if not specified)")
     parser.add_argument("--config", type=str, default=None,
                        help="Path to config file (optional)")
     parser.add_argument("--prompt", type=str, default=None,
@@ -193,8 +193,21 @@ def main():
 
     args = parser.parse_args()
 
+    # Find model if not specified
+    model_path = args.model
+    if not model_path:
+        best_checkpoint = find_best_checkpoint()
+        if not best_checkpoint:
+            print("❌ No trained models found!")
+            print("Please train a model first:")
+            print("  python -m minigpt.train --config configs/small.yaml")
+            print("  or run: python autoTest.py")
+            return
+        model_path = str(best_checkpoint)
+        print(f"📁 Using model: {model_path}")
+
     # Initialize chatbot
-    chatbot = ChatBot(args.model, args.config)
+    chatbot = ChatBot(model_path, args.config)
 
     if args.prompt:
         # Single prompt mode

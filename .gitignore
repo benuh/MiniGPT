@@ -55,16 +55,33 @@ venv.bak/
 ehthumbs.db
 Thumbs.db
 
-# Project specific
+# Project specific - Trained models and local data
 checkpoints/
 logs/
 experiments/
 data/raw/
+data/processed/
 wandb/
 outputs/
 
-# Keep empty directories
+# AutoTest generated files (local only)
+autotest.log
+autotest_report_*.json
+training_autotest.log
+training_progress.json
+
+# Local model artifacts
+*.model
+*.checkpoint
+model_*.json
+evaluation_*.json
+
+# Keep empty directories but exclude all contents
 !checkpoints/.gitkeep
 !logs/.gitkeep
 !experiments/.gitkeep
 !data/.gitkeep
+
+# Frontend build artifacts (regenerated locally)
+frontend/build/
+frontend/node_modules/
